@@ -1,0 +1,27 @@
+# Created by https://www.toptal.com/developers/gitignore/api/vagrant
+# Edit at https://www.toptal.com/developers/gitignore?templates=vagrant
+
+### Vagrant ###
+# General
+.vagrant/
+
+# Log files (if you are creating logs in debug mode, uncomment this)
+# *.log
+
+## Any vmdk files
+*.vmdk
+
+### Vagrant Patch ###
+*.box
+
+# lab files
+*.lab
+lab-hosts.txt
+
+# Exclude everything in all 'software' folders except .gitkeep files
+/*/software/*
+!/*/software/.gitkeep
+
+# Exclude everything in all 'extra-disks' folders except .gitkeep files
+/*/extra-disks/*
+!/*/extra-disks/.gitkeep

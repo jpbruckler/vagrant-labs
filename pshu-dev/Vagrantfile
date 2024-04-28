@@ -1,0 +1,26 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+require 'yaml'
+servers = YAML.load_file(File.join(File.dirname(__FILE__), 'servers.yaml'))
+vdiskmanager    = '"C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"'
+
+Vagrant.configure("2") do |config|
+  servers.each do |server|
+    puts "Configuring server: #{server['name']}"
+    data_disk_dir = File.join(File.expand_path(File.dirname(__FILE__)), "extra-disks/#{server['name']}")
+
+    config.vm.define server["name"] do |srv|
+      srv.vm.box      = server["box"]
+      srv.vm.hostname = server["name"]
+
+      # VMWare specific configuration
+      srv.vm.provider "vmware_desktop" do |vm|
+        vm.vmx["memsize"]   = "#{server['memory']}"
+        vm.vmx["numvcpus"]  = "#{server['cpus']}"
+        vm.vmx["cpuid.coresPerSocket"]  = "2"
+        vm.gui = true
+      end
+    end
+  end
+end

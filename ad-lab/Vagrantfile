@@ -1,0 +1,118 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# This vagrantfile has a lot of workarounds for the limitations of Vagrant
+# and the VMWare Workstation provider.
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+# Load the configuration from the provision.yaml file
+
+
+
+require 'yaml'
+conf = YAML.load_file(File.join(File.dirname(__FILE__), 'provision.yaml'))
+servers = conf['servers']
+vars = conf['vars']
+vdiskmanager    = '"C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"'
+
+Vagrant.configure("2") do |config|
+  servers.each do |server|
+    config.vm.define server["name"] do |srv|
+      srv.vm.box      = server["box"]
+      srv.vm.hostname = server["name"]
+
+      #
+      # VMWare specific configuration
+      #
+      srv.vm.provider "vmware_desktop" do |vm|
+        vm.vmx["memsize"]   = "#{server['memory']}"
+        vm.vmx["numvcpus"]  = "#{server['cpus']}"
+        vm.vmx["cpuid.coresPerSocket"]  = "1"
+        vm.gui = true
+
+        if server.key?("staticip")
+          vm.base_address = server["staticip"]["base_address"]
+          vm.base_mac = server["staticip"]["base_mac"]
+        end
+
+        # use the plaintext WinRM transport and force it to use basic authentication.
+        # NB this is needed because the default negotiate transport stops working
+        #    after the domain controller is installed.
+        #    see https://groups.google.com/forum/#!topic/vagrant-up/sZantuCM0q4
+        srv.winrm.transport = :plaintext
+        srv.winrm.basic_auth_only = true
+
+        if server.key?("net")
+          vm.vmx["ethernet1.vnet"] = "VMnet1"
+          vm.vmx["ethernet1.displayName"] = "VMnet1"
+          vm.vmx["ethernet1.virtualDev"] = "e1000e"
+          vm.vmx["ethernet1.present"] = "TRUE"
+        end
+      end # srv.vm.provider
+
+      #
+      # Handle net config for additional network interfaces
+      # 
+      if server.key?("net")
+        srv.vm.provision "shell", 
+          path: "scripts/provision/configure-static-ip.ps1", 
+          privileged: true,
+          args: "'Ethernet1' #{server['net']['ipaddress']} #{server['net']['gateway']} #{server['net']['dnsserver']} #{server['net']['dnssearchlist']}"
+        srv.vm.provision "shell", reboot: true
+      end
+
+      #
+      # Handle additional disks
+      #
+      if server.key?("disks")
+        server["disks"].each do |disk|
+          data_disk_dir = File.join(File.expand_path(File.dirname(__FILE__)), "extra-disks/#{server['name']}")
+          extra_vmdk_path = "#{data_disk_dir}/#{disk['name']}.vmdk".gsub('/', '\\')
+
+          unless File.directory?(data_disk_dir)
+            Dir.mkdir(data_disk_dir)
+          end
+
+          unless File.exists?(extra_vmdk_path)
+            system("#{vdiskmanager} -c -s #{disk['size']}GB -t 0 \"#{extra_vmdk_path}\"")
+          end
+        end
+        srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
+      end
+
+
+      # Run default provisioning scripts
+      srv.vm.provision "shell", path: "scripts/provision/configure-filesystem.ps1", privileged: false
+      srv.vm.provision "shell", path: "scripts/provision/install-pwsh-v7.ps1", privileged: true
+      srv.vm.provision "shell", reboot: true
+      srv.vm.provision "shell", path: "scripts/provision/install-choco.ps1", privileged: true
+
+      if server.key?("packages")
+        srv.vm.provision "shell", path: "scripts/provision/install-chocopackages.ps1", privileged: true, args: server["packages"]
+      else
+        srv.vm.provision "shell", path: "scripts/provision/install-chocopackages.ps1", privileged: true
+      end
+
+      # Check if 'roles' key is defined and is an Array
+      if server.key?("roles") && server["roles"].is_a?(Array)
+        # Loop through each role and apply necessary provisioning
+        server["roles"].each do |role|
+          case role
+            when "domain-controller"
+              srv.vm.provision "shell", path: "scripts/roles/domain-controller/install-adds.ps1", privileged: true, args: "'#{vars['domainname']}' '#{vars['netbiosname']}' '#{vars['safemodepassword']}'"
+              srv.vm.provision "shell", reboot: true
+              srv.vm.provision "shell", path: "scripts/roles/domain-controller/importusers.ps1", privileged: false
+            when "member-server"
+              srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true, args: "'#{vars['domainname']} #{vars['primarydns']}'"
+            when "powershelluniversal"
+              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-pwshuniversal.ps1", privileged: true
+          end
+        end # end role loop
+
+      end # end role check
+
+    end # config.vm.define
+  end # servers.each
+end

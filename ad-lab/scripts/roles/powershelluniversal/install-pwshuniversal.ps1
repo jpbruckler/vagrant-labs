@@ -1,3 +1,8 @@
+param(
+    [string] $ServiceAccountUsername,
+    [string] $ServiceAccountPassword
+)
+
 $MAJOR_VERSION  = 4  # 4 or 5
 $BUILD_TYPE     = 'Production' # 'Production' or 'Nightly'
 $TEMP_DIR       = 'C:\Temp' # Directory to download files to
@@ -78,4 +83,24 @@ try {
 } catch {
     Write-Error "Failed to download $($downloads.Name): $_"
     exit 1
+}
+
+# Install the MSI file
+$InstallLog = "{0}\logs\{1}-install.log" -f 'c:\tmp\logs', $downloads.Name
+$RepoFolder = 'D:\UniversalAutomation'
+$ConnectionString = "Source=$RepoFolder\database.db"
+if ($ServiceAccountUsername -and $ServiceAccountPassword) {
+    $ServiceCred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $ServiceAccountUsername, (ConvertTo-SecureString -String $ServiceAccountPassword -AsPlainText -Force)
+} 
+
+if ($ServiceCred) {
+    $ServiceAccount = $($ServiceCred.username)
+    $ServiceAccountPW = $($ServiceCred.getnetworkcredential().password)
+    Write-Host "Executing msiexec with Service Account configuration..."
+    Write-Host "Msi log: $InstallLog"
+    msiexec /i ("{0}" -f $msi.FullName) /q /norestart /l*v $InstallLog REPOFOLDER="$RepoFolder" CONNECTIONSTRING="$ConnectionString" SERVICEACCOUNT="$ServiceAccount" SERVICEACCOUNTPASSWORD="$ServiceAccountPW"
+}
+else {
+    Write-Host "Executing msiexec..."
+    msiexec /i ("{0}" -f $msi.FullName) /q /norestart /l*v $InstallLog REPOFOLDER="RepoFolder" CONNECTIONSTRING="$ConnectionString"
 }

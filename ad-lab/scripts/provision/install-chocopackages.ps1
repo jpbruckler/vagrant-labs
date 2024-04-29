@@ -1,22 +1,24 @@
-# Packages to install
-$packages = @(
-    'git.install',
-    '7zip',
-    'vscode',
-    'sysinternals',
-    'helix'
+param(
+    [string[]] $Packages
 )
 
-if (Get-Command choco -ErrorAction SilentlyContinue) {
-    Write-Host "Chocolatey is already installed"
-} else {
-    Write-Host "Installing Chocolatey..."
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+$Packages += 'sysinternals'
+
+$ErrorActionPreference = "Stop"
+
+if (-not (Test-Path 'C:\ProgramData\chocolatey')) {
+    Write-Host "Chocolatey is not installed. Installing Chocolatey..."
+    Set-ExecutionPolicy Bypass -Scope Process -Force; 
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; 
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 }
 
-foreach ($package in $packages) {
-    Write-Host "Installing $package"
-    choco install $package -y
+if ($Packages) {
+    Write-Host "Installing Chocolatey packages..."
+    foreach ($Package in $Packages) {
+        Write-Host "Installing $Package..."
+        choco install $Package -y
+    }
 }
 
 Write-Host "Chocolatey packages installed"

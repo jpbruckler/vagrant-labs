@@ -3,6 +3,10 @@ $pattern = 'PowerShell\-([\d\.]+)-win-x64.msi'
 $dldir = 'C:\vagrant\software'
 $msiArgs = '/quiet ADD_EXPLORER_CONTEXT_MENU_OPENPOWERSHELL=1 ADD_FILE_CONTEXT_MENU_RUNPOWERSHELL=1 REGISTER_MANIFEST=1 USE_MU=1 ENABLE_MU=1 ADD_PATH=1'
 
+if (-not (Test-Path $dldir)) {
+    New-Item -Path $dldir -ItemType Directory
+}
+
 Write-Host 'Checking for the latest stable version of PowerShell...'
 
 if ((Invoke-RestMethod https://aka.ms/powershell-release?tag=stable) -match $pattern) {

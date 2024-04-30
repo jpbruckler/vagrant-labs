@@ -4,6 +4,7 @@ vars:
   netbiosname: DEV
   safemodepass: Admin123#
   primarydns: 192.168.13.10
+  vdiskmgr_path: "C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"
 servers:
   - name: dev-dc01
     box: gusztavvargadr/windows-server-2022-standard
@@ -14,14 +15,6 @@ servers:
       base_mac: 00:50:56:38:10:82
     roles: 
       - domain-controller
-  - name: dev-pki01
-    box: gusztavvargadr/windows-server-2022-standard-core
-    memory: 2048
-    cpus: 2
-    roles:
-      - member-server
-    packages:
-      - git.install
   - name: dev-irms01
     box: gusztavvargadr/windows-server-2022-standard-core
     memory: 4096
@@ -32,6 +25,7 @@ servers:
     disks:
       - name: universal
         size: 120
+        driveletter: D
     packages:
       - git
       - helix

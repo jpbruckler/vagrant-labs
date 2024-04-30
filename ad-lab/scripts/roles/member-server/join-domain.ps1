@@ -6,7 +6,7 @@ param (
 )
 
 if ($DnsServer) {
-    Set-DnsClientServerAddress -ServerAddresses $DnsServer
+    Set-DnsClientServerAddress -ServerAddresses $DnsServer -InterfaceAlias 'Ethernet0'
 }
 
 $UpdatedSearchList = @()

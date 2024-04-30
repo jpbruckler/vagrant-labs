@@ -3,7 +3,7 @@ function Get-NextAvailableDriveLetter {
     $usedDriveLetters = (Get-Volume | Select-Object -ExpandProperty DriveLetter) + (Get-Partition | Select-Object -ExpandProperty DriveLetter)
 
     # Define the range of drive letters from Z to A
-    $driveLetters = 90..65 | ForEach-Object { [char]$_ }
+    $driveLetters = 88..65 | ForEach-Object { [char]$_ }
 
     # Find the first available drive letter from Z to A
     foreach ($letter in $driveLetters) {

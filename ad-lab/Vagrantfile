@@ -7,84 +7,82 @@
 # Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
 VAGRANTFILE_API_VERSION = "2"
 
-# Load the configuration from the provision.yaml file
-
-
-
 require 'yaml'
-conf = YAML.load_file(File.join(File.dirname(__FILE__), 'provision.yaml'))
-servers = conf['servers']
-vars = conf['vars']
-vdiskmanager    = '"C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"'
 
-Vagrant.configure("2") do |config|
+# Load the provision.yaml file
+conf    = YAML.load_file(File.join(File.dirname(__FILE__), 'provision.yaml'))
+servers = conf['servers']
+vars    = conf['vars']
+vdiskmgr_path = conf['vdiskmgr_path']
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   servers.each do |server|
     config.vm.define server["name"] do |srv|
       srv.vm.box      = server["box"]
       srv.vm.hostname = server["name"]
 
-      #
-      # VMWare specific configuration
-      #
+      # Use the plaintext WinRM transport and force it to use basic authentication.
+      # NB this is needed because the default negotiate transport stops working
+      #    after the domain controller is installed.
+      #    see https://groups.google.com/forum/#!topic/vagrant-up/sZantuCM0q4
+      srv.winrm.transport = :plaintext
+      srv.winrm.basic_auth_only = true
+
+      # VMware specific configuration
       srv.vm.provider "vmware_desktop" do |vm|
-        vm.vmx["memsize"]   = "#{server['memory']}"
-        vm.vmx["numvcpus"]  = "#{server['cpus']}"
         vm.vmx["cpuid.coresPerSocket"]  = "1"
+        vm.vmx["memsize"]               = server['memory'] || "1024"
+        vm.vmx["numvcpus"]              = server['cpus'] || "2"
         vm.gui = true
 
+        # Configure network settings for an additional network adapter
+        if server.key?("net")
+          vm.vmx["ethernet1.vnet"]        = server['net']['vnet'] || "VMnet1"
+          vm.vmx["ethernet1.displayName"] = server['net']['vnet'] || "VMnet1"
+          vm.vmx["ethernet1.virtualDev"]  = server['net']['virtualdev'] || "e1000e"
+          vm.vmx["ethernet1.present"]     = "TRUE"
+        end
+
+        # Configure VMWare Provider to create DHCP reservations
         if server.key?("staticip")
           vm.base_address = server["staticip"]["base_address"]
-          vm.base_mac = server["staticip"]["base_mac"]
+          vm.base_mac     = server["staticip"]["base_mac"]
         end
 
-        # use the plaintext WinRM transport and force it to use basic authentication.
-        # NB this is needed because the default negotiate transport stops working
-        #    after the domain controller is installed.
-        #    see https://groups.google.com/forum/#!topic/vagrant-up/sZantuCM0q4
-        srv.winrm.transport = :plaintext
-        srv.winrm.basic_auth_only = true
+        #
+        # Handle disk configuration
+        # Initialize a disk number counter, loop through defined disks,
+        # create the disk if it doesn't exist, and add it to the VM configuration.
+        if server.key?("disks")
+          disk_number = 0
+          server["disks"].each do |disk|
+            extra_disk_dir  = File.join(File.expand_path(File.dirname(__FILE__)), "extra-disks/#{server['name']}")
+            extra_disk_path = "#{extra_disk_dir}/#{disk['name']}.vmdk".gsub('/', '\\')
 
-        if server.key?("net")
-          vm.vmx["ethernet1.vnet"] = "VMnet1"
-          vm.vmx["ethernet1.displayName"] = "VMnet1"
-          vm.vmx["ethernet1.virtualDev"] = "e1000e"
-          vm.vmx["ethernet1.present"] = "TRUE"
-        end
-      end # srv.vm.provider
+            unless File.directory?(extra_disk_dir)
+              Dir.mkdir(extra_disk_dir)
+            end
 
-      #
-      # Handle net config for additional network interfaces
-      # 
-      if server.key?("net")
-        srv.vm.provision "shell", 
-          path: "scripts/provision/configure-static-ip.ps1", 
-          privileged: true,
-          args: "'Ethernet1' #{server['net']['ipaddress']} #{server['net']['gateway']} #{server['net']['dnsserver']} #{server['net']['dnssearchlist']}"
-        srv.vm.provision "shell", reboot: true
-      end
+            unless File.exists?(extra_disk_path)
+              system("#{vdiskmgr_path} -c -s #{disk['size']}GB -t 0 \"#{extra_disk_path}\"")
+            end
 
-      #
-      # Handle additional disks
-      #
-      if server.key?("disks")
-        server["disks"].each do |disk|
-          data_disk_dir = File.join(File.expand_path(File.dirname(__FILE__)), "extra-disks/#{server['name']}")
-          extra_vmdk_path = "#{data_disk_dir}/#{disk['name']}.vmdk".gsub('/', '\\')
+            # Add disk to VM configuration
+            vm.vmx["nvme0:#{disk_number}.fileName"] = extra_disk_path
+            vm.vmx["nvme0:#{disk_number}.present"] = "TRUE"
+            vm.vmx["nvme0:#{disk_number}.redo"] = ""
 
-          unless File.directory?(data_disk_dir)
-            Dir.mkdir(data_disk_dir)
-          end
+            # Increment the disk number for the next disk
+            disk_number += 1            
+          end #end disks.each
+          srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
+          srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
+        end #end if server.key?("disks")
+      end #end vm.provider "vmware_desktop"
 
-          unless File.exists?(extra_vmdk_path)
-            system("#{vdiskmanager} -c -s #{disk['size']}GB -t 0 \"#{extra_vmdk_path}\"")
-          end
-        end
-        srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
-      end
-
-
-      # Run default provisioning scripts
+      # Configure the VM
       srv.vm.provision "shell", path: "scripts/provision/configure-filesystem.ps1", privileged: false
+      srv.vm.provision "shell", path: "scripts/provision/configure-firewall.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/install-pwsh-v7.ps1", privileged: true
       srv.vm.provision "shell", reboot: true
       srv.vm.provision "shell", path: "scripts/provision/install-choco.ps1", privileged: true
@@ -105,14 +103,15 @@ Vagrant.configure("2") do |config|
               srv.vm.provision "shell", reboot: true
               srv.vm.provision "shell", path: "scripts/roles/domain-controller/importusers.ps1", privileged: false
             when "member-server"
-              srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true, args: "'#{vars['domainname']} #{vars['primarydns']}'"
+              srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true, args: "'#{vars['domainname']}' '#{vars['primarydns']}'"
             when "powershelluniversal"
+              srv.vm.provision "shell", path: "scripts/provision/configure-servercore.ps1", privileged: false
               srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-pwshuniversal.ps1", privileged: true
+              srv.vm.provision "shell", reboot: true
           end
         end # end role loop
-
       end # end role check
 
-    end # config.vm.define
-  end # servers.each
+    end #end config.vm.define
+  end #end servers.each
 end

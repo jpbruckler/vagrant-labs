@@ -6,7 +6,8 @@ $ErrorActionPreference = "Stop"
 
 function Get-UsedDriveLetters {
     # Get all current drive letters in use
-    $usedDriveLetters = Get-CimInstance -ClassName Win32_Volume | Select-Object -ExpandProperty DriveLetter
+    $usedDriveLetters = @()
+    Get-CimInstance -ClassName Win32_Volume | Select-Object -ExpandProperty DriveLetter | ForEach-Object { $usedDriveLetters += $_ -replace ':', '' }
     return $usedDriveLetters
 }
 
@@ -20,7 +21,7 @@ function Get-NextAvailableDriveLetter {
     # Find the first available drive letter from Z to A
     foreach ($letter in $driveLetters) {
         if ($letter -notin $usedDriveLetters) {
-            return $letter + ":"
+            return $letter
         }
     }
 
@@ -28,12 +29,16 @@ function Get-NextAvailableDriveLetter {
     return $null
 }
 
-if (Get-UsedDriveLetters -contains $DriveLetter) {
+if ((Get-UsedDriveLetters) -contains $DriveLetter) {
     Write-Host "Drive letter $DriveLetter is already in use."
+    Write-Host "Checking for CD-ROM drives..."
     $CdRoms = Get-CimInstance -ClassName Win32_Volume -Filter "DriveType = 5"
+
+
     if ($CdRoms) {
         foreach ($drive in $CdRoms) {
-            $driveLetter = Get-NextAvailableDriveLetter
+            $driveLetter = "{0}:" -f (Get-NextAvailableDriveLetter)
+            Write-Host "Relettering CD-ROM drive $($drive.Name) to $driveLetter"
             $drive | Set-CimInstance -Property @{ DriveLetter = "$driveLetter" }
         }
     } else {
@@ -52,11 +57,13 @@ if (Get-UsedDriveLetters -contains $DriveLetter) {
 
 
 # Get all disks that are Offline
-$disks = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' } | Select-Object -First 1
+$targetDisks = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.OperationalStatus -eq 'Offline' } 
 
-if ($null -ne $disks) {
-    foreach ($disk in $disks) {
+if ($null -ne $targetDisks) {
+    foreach ($disk in $targetDisks) {
+        $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter)
         Write-Host "Initializing disk $($disk.Number)..."
+
         try {
             # Set the disk to Online
             Set-Disk -Number $disk.Number -IsOffline $false

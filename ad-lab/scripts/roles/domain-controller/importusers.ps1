@@ -100,5 +100,18 @@ New-ADUser `
     -PasswordNeverExpires $True
 
 
+# PowershellUniversal service account
+New-AdUser `
+    -SamAccountName "dev-irms-pshu" `
+    -UserPrincipalName "dev-irms-pshu@dev.local" `
+    -Name "dev-irms-pshu" `
+    -GivenName "dev-irms" `
+    -Surname "pshu" `
+    -Enabled $True `
+    -DisplayName "dev-irms-pshu" `
+    -AccountPassword (convertto-securestring "sockMonkey0!" -AsPlainText -Force) `
+    -EmailAddress "dev-irms-pshu@dev.local" `
+    -PasswordNeverExpires $True
+
 # return success, even if there were warnings or errors above
 exit 0

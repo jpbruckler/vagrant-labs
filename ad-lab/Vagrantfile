@@ -13,7 +13,7 @@ require 'yaml'
 conf    = YAML.load_file(File.join(File.dirname(__FILE__), 'provision.yaml'))
 servers = conf['servers']
 vars    = conf['vars']
-vdiskmgr_path = conf['vdiskmgr_path']
+vdiskmgr_path = '"C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"'
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   servers.each do |server|
@@ -54,7 +54,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         # Initialize a disk number counter, loop through defined disks,
         # create the disk if it doesn't exist, and add it to the VM configuration.
         if server.key?("disks")
-          disk_number = 0
+          disk_number = 1
           server["disks"].each do |disk|
             extra_disk_dir  = File.join(File.expand_path(File.dirname(__FILE__)), "extra-disks/#{server['name']}")
             extra_disk_path = "#{extra_disk_dir}/#{disk['name']}.vmdk".gsub('/', '\\')
@@ -75,12 +75,19 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
             # Increment the disk number for the next disk
             disk_number += 1            
           end #end disks.each
-          srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
-          srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
         end #end if server.key?("disks")
       end #end vm.provider "vmware_desktop"
 
       # Configure the VM
+      if vars.key?("locale")
+        sys_tz = vars['locale']['timezone'] || 'Eastern Standard Time'
+        sys_lc = vars['locale']['culture'] || 'en-US'
+        srv.vm.provision "shell", path: "scripts/provision/configure-locale.ps1", privileged: true, args: "'#{sys_lc}', '#{sys_tz}'"
+        srv.vm.provision "shell", reboot: true
+      end
+      
+      srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
+      srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
       srv.vm.provision "shell", path: "scripts/provision/configure-filesystem.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/configure-firewall.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/install-pwsh-v7.ps1", privileged: true
@@ -105,13 +112,18 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
             when "member-server"
               srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true, args: "'#{vars['domainname']}' '#{vars['primarydns']}'"
             when "powershelluniversal"
+              irms_account  = vars['irms']&.[]('account')   # safe navigation operator; set to nil if not found
+              irms_password = vars['irms']&.[]('password')  # safe navigation operator; set to nil if not found
               srv.vm.provision "shell", path: "scripts/provision/configure-servercore.ps1", privileged: false
-              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-pwshuniversal.ps1", privileged: true
+              srv.vm.provision "shell", path: "scripts/provision/add-rsatadtools.ps1", privileged: true
+              srv.vm.provision "shell", path: "scripts/provision/add-rsatadposh.ps1", privileged: true
               srv.vm.provision "shell", reboot: true
-          end
+              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-pwshuniversal.ps1", privileged: true, args: "'#{irms_account}' '#{irms_password}'"
+              srv.vm.provision "shell", reboot: true
+          end #end case role
         end # end role loop
       end # end role check
-
+      srv.vm.provision "shell", path: "scripts/utils/export-ipinfo.ps1", privileged: false
     end #end config.vm.define
   end #end servers.each
 end

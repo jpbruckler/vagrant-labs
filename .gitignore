@@ -6,7 +6,7 @@
 .vagrant/
 
 # Log files (if you are creating logs in debug mode, uncomment this)
-# *.log
+ *.log
 
 ## Any vmdk files
 *.vmdk
@@ -17,6 +17,7 @@
 # lab files
 *.lab
 lab-hosts.txt
+*.csv
 
 # Exclude everything in all 'software' folders except .gitkeep files
 /*/software/*

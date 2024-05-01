@@ -4,7 +4,12 @@ vars:
   netbiosname: DEV
   safemodepass: Admin123#
   primarydns: 192.168.13.10
-  vdiskmgr_path: "C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"
+  locale:
+    culture: en-US
+    timezone: Eastern Standard Time
+env:
+  domainname: dev.local
+  netbiosname: DEV
 servers:
   - name: dev-dc01
     box: gusztavvargadr/windows-server-2022-standard
@@ -29,4 +34,7 @@ servers:
     packages:
       - git
       - helix
+    irms:
+      service_account: "DTM\\svc-powershelluniversal"
+      account_pw: "sockMonkey0!"
 

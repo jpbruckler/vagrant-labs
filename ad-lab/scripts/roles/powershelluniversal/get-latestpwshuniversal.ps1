@@ -1,3 +1,37 @@
+<#
+    .SYNOPSIS
+        Downloads and verifies the latest version of PowerShell Universal for a
+        specified major version.
+
+    .DESCRIPTION
+        This script identifies the latest version of PowerShell Universal that
+        matches a specified major version number from a predefined build type (Production or Nightly). It retrieves the MSI installer and its associated SHA256 hash from a Microsoft Azure blob storage, validates the hash to ensure the download's integrity, and saves the installer to a specified directory.
+
+    .PARAMETER BuildType
+        The type of build to download. Accepts 'Production' or 'Nightly'.
+        Default is 'Production'.
+
+    .PARAMETER MajorVersion
+        The major version number of PowerShell Universal to download. Currently
+        supports versions '4' and '5'. Default is '4'.
+
+    .PARAMETER DownloadDir
+        The directory to which the MSI file will be downloaded. Default is the
+        'software' directory under 'vagrant' on the system drive.
+
+    .EXAMPLE
+        PS> .\ScriptName.ps1 -BuildType 'Production' -MajorVersion '5'
+        Downloads the latest production build of PowerShell Universal version 5.
+
+    .EXAMPLE
+        PS> .\ScriptName.ps1 -BuildType 'Nightly' -MajorVersion '4' -DownloadDir 'D:\downloads'
+        Downloads the latest nightly build of PowerShell Universal version 4 to the specified directory on the D: drive.
+
+    .NOTES
+        The script requires internet connectivity. It also needs permissions to
+        write to the specified directory. Ensure execution policies allow script
+        running.
+#>
 param(
     [Parameter(Mandatory = $false, Position = 0)]
     [ValidateSet('Production', 'Nightly')]
@@ -8,7 +42,7 @@ param(
     [string] $MajorVersion = '4',
 
     [Parameter(Mandatory = $false, Position = 2)]
-    [string] $DownloadDir = 'C:\vagrant\software'
+    [string] $DownloadDir = ('{0}:\vagrant\software' -f $env:SystemDrive)
 )
 
 # Don't change anything below this line
@@ -87,3 +121,5 @@ try {
     Write-Error "Failed to download $($downloads.Name): $_"
     exit 1
 }
+
+exit 0

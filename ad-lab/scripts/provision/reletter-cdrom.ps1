@@ -2,7 +2,8 @@ function Get-NextAvailableDriveLetter {
     # Get all current drive letters in use
     $usedDriveLetters = (Get-Volume | Select-Object -ExpandProperty DriveLetter) + (Get-Partition | Select-Object -ExpandProperty DriveLetter)
 
-    # Define the range of drive letters from Z to A
+    # Define the range of drive letters from X to A
+    # Avoid Z because Vagrant. Avoid Y because it's likely a network drive.
     $driveLetters = 88..65 | ForEach-Object { [char]$_ }
 
     # Find the first available drive letter from Z to A

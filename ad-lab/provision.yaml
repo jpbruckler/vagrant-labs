@@ -3,7 +3,7 @@ vars:
   domainname: dev.local
   netbiosname: DEV
   safemodepass: Admin123#
-  primarydns: 192.168.13.10
+  primarydns: 192.168.118.10
   locale:
     culture: en-US
     timezone: Eastern Standard Time
@@ -16,7 +16,7 @@ servers:
     memory: 2048
     cpus: 4
     staticip:
-      base_address: 192.168.13.10
+      base_address: 192.168.118.10
       base_mac: 00:50:56:38:10:82
     roles: 
       - domain-controller

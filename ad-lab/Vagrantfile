@@ -34,7 +34,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         vm.vmx["memsize"]               = server['memory'] || "1024"
         vm.vmx["numvcpus"]              = server['cpus'] || "2"
         vm.gui = true
-
+        vm.clone_directory = "D:\\VMs\\machines\\#{server['name']}"
         # Configure network settings for an additional network adapter
         if server.key?("net")
           vm.vmx["ethernet1.vnet"]        = server['net']['vnet'] || "VMnet1"

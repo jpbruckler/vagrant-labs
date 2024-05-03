@@ -1,3 +1,41 @@
+function Write-ProvisionScriptHeader {
+    <#
+    .SYNOPSIS
+        Writes a header for a provisioning script.
+
+    .DESCRIPTION
+        This function writes a header to the console for a provisioning script.
+        The header includes the script name, a timestamp, and a description.
+
+    .PARAMETER ScriptName
+        The name of the provisioning script.
+
+    .PARAMETER Description
+        A brief description of the provisioning script.
+
+    .EXAMPLE
+        Write-ProvisionScriptHeader -ScriptName "configure-filesystem.ps1" -Description "Creates directories for tools and logs"
+
+        Writes a header for the "configure-filesystem.ps1" script with the specified description.
+    #>
+    param (
+        [Parameter(Mandatory = $false)]
+        [string] $ScriptName,
+        [string] $Title = "Vagrant Provisioning Script"
+    )
+
+    if (-not $ScriptName) {
+        $ScriptName = $MyInvocation.PSCommandPath | Split-Path -Leaf
+    }
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff K"
+    
+    $Lines = @{
+        "Script" = $ScriptName
+        "Timestamp" = $timestamp
+    }
+    Write-AsciiBox -Title $Title -Lines $Lines
+}
+
 function Write-Log {
     <#
     .SYNOPSIS
@@ -216,14 +254,14 @@ function Write-AsciiBox {
         [int]$Width = 80
     )
     
-    $FirstLine  = '┌' + ('─' * ($Width - 2)) + '┐'
-    $BlankLine  = '│' + (' ' * ($Width - 2)) + '│'
-    $Separator  = '├' + ('─' * ($Width - 2)) + '┤'
-    $LastLine   = '└' + ('─' * ($Width - 2)) + '┘'
+    $FirstLine  = '+' + ('-' * ($Width - 2)) + '+'
+    $BlankLine  = '|' + (' ' * ($Width - 2)) + '|'
+    $Separator  = '+' + ('-' * ($Width - 2)) + '+'
+    $LastLine   = '+' + ('-' * ($Width - 2)) + '+'
 
     Write-Host $FirstLine
     Write-Host $BlankLine
-    Write-Host ('│' + (' ' * [math]::Floor(($Width - 2 - $Title.Length) / 2)) + $Title + (' ' * [math]::Ceiling(($Width - 2 - $Title.Length) / 2)) + '│')
+    Write-Host ('|' + (' ' * [math]::Floor(($Width - 2 - $Title.Length) / 2)) + $Title + (' ' * [math]::Ceiling(($Width - 2 - $Title.Length) / 2)) + '|')
     Write-Host $BlankLine
 
     if ($Lines.Count -gt 0) {
@@ -236,7 +274,7 @@ function Write-AsciiBox {
         foreach ($line in $Lines.GetEnumerator()) {
             $text = '{0}{1}: {2}' -f $line.Key, ('.' * (($longestKey + 4) - ($line.Key.tostring().length))), $line.Value
             $spaces = ($Width - 3) - $text.Length
-            Write-Host ('│ ' + $text + (' ' * $spaces) + '│')
+            Write-Host ('| ' + $text + (' ' * $spaces) + '|')
         }
         Write-Host $BlankLine
     }

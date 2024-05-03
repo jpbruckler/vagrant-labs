@@ -401,7 +401,7 @@ function Get-PwshUniversalInstallerInfo {
                     Select-Object -Property Name, Url, @{n="LastModified";e={(Get-Date $_.Properties.'Last-Modified')}} | 
                     Sort-Object -Property LastModified -Descending | 
                     Where-Object Name -match $pattern |
-                    Whre-Object Name -notmatch 'sha256' |
+                    Where-Object Name -notmatch 'sha256' |
                     Select-Object -First 1
         
         $hashUrl = '{0}.sha256' -f $file.Url

@@ -208,6 +208,23 @@ function Get-NextAvailableDriveLetter {
     return $null
 }
 
+function Set-CDRomDriveLetter {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $DriveLetter,
+        [Parameter(Mandatory = $true)]
+        [CimInstance] $Drive
+    )
+
+    try {
+        $Drive | Set-CimInstance -Property @{ DriveLetter = "$DriveLetter" } -ErrorAction Stop
+        return $true
+    }
+    catch {
+        Write-Error -Message "Failed to reletter drive '$($Drive.Name)': $_"
+        return $false
+    }
+}
 
 <#
     .SYNOPSIS

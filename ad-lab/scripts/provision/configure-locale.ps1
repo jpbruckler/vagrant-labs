@@ -4,7 +4,7 @@ param(
 )
 $start = Get-Date
 $InformationPreference = "Continue"
-. $PSScriptRoot\..\utils\deploy-utils.ps1
+. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
 Write-ProvisionScriptHeader
 

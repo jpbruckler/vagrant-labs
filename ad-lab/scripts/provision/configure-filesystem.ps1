@@ -1,10 +1,11 @@
 $start = Get-Date
 $InformationPreference = "Continue"
-. $PSScriptRoot\..\utils\deploy-utils.ps1
+. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
 Write-ProvisionScriptHeader
 Write-Information -MessageData "Creating directories for tools and logs.."
 
+$rc = 0
 $Directories = @("C:\tools", "C:\tmp", "C:\tmp\logs")
 foreach ($Directory in $Directories) {
     if (-not (Test-Path -Path $Directory -PathType Container)) {
@@ -16,6 +17,7 @@ foreach ($Directory in $Directories) {
             Write-Information -MessageData "`tDirectory '$Directory' created."
         } catch {
             Write-Error -Message "Failed to create directory '$Directory'."
+            $rc = 1
         }
     } else {
         Write-Information -MessageData "`tDirectory '$Directory' already exists."
@@ -24,4 +26,4 @@ foreach ($Directory in $Directories) {
 $end = Get-Date
 Write-Information -MessageData "Time taken: $(($end - $start).TotalSeconds) seconds."
 Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
-exit 0
+exit $rc

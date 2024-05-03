@@ -50,62 +50,60 @@ $Disks | Select-Object Number, FriendlyName, OperationalStatus, PartitionStyle, 
 Write-Information -MessageData "Volume information:"
 $Volumes | Select-Object DriveLetter, Label, DriveType | Format-Table -AutoSize
 
-# Check if the specified drive letter is already in use by a CD-ROM drive
-# CD-ROM has DriveType = 5
-Write-Information -MessageData "Checking if drive letter $DriveLetter is already in use..."
-if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
-    $usedVolume = $Volumes | Where-Object { $_.DriveLetter -eq "${DriveLetter}:" }
-    if ($usedVolume.DriveType -eq 5) {
-        Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
-        Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
-        $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
+Write-Information -MessageData "Checking for offline or raw disks..."
+$targetDisks = $Disks | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.OperationalStatus -eq 'Offline' } 
 
-        Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
-        $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
+if ($null -eq $targetDisks) {
+    Write-Information -MessageData "`tNo offline or raw disks found. Nothing to do."
+} else {
+    # Check if the specified drive letter is already in use by a CD-ROM drive
+    # CD-ROM has DriveType = 5
+    Write-Information -MessageData "Checking if drive letter $DriveLetter is already in use..."
+    if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
+        $usedVolume = $Volumes | Where-Object { $_.DriveLetter -eq "${DriveLetter}:" }
+        if ($usedVolume.DriveType -eq 5) {
+            Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
+            Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
+            $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
 
-        if ($result) {
-            Write-Information -MessageData "`tDrive letter $cdDriveLetter has been reassigned to CD-ROM drive $($usedVolume.Name)."
+            Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
+            $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
+
+            if ($result) {
+                Write-Information -MessageData "`tDrive letter $cdDriveLetter has been reassigned to CD-ROM drive $($usedVolume.Name)."
+            }
+            else {
+                Write-Informaton -MessageData "`tFailed to reassign drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)."
+                Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
+                $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
+            }
         }
         else {
-            Write-Error -Message "`tFailed to reassign drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)."
+            Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a non-CD-ROM drive."
             Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
             $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
         }
     }
-    else {
-        Write-Error -Message "`tDrive letter $DriveLetter is already in use by a non-CD-ROM drive."
-        Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
-        $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
-    }
-}
 
-
-# Get all disks that are either Offline or have a RAW partition style
-Write-Information -MessageData "Checking for offline or raw disks..."
-$targetDisks = $Disks | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.OperationalStatus -eq 'Offline' } 
-if ($null -ne $targetDisks) {
+    # Initialize and format the target disks
     foreach ($disk in $targetDisks) {
         Write-Host "Initializing disk $($disk.Number)..."
-
         try {
             # Set the disk to Online
             Write-Information -MessageData "`tSetting disk $($disk.Number) to Online..."
             Set-Disk -Number $disk.Number -IsOffline $false
         }
         catch {
-            Write-Error "Failed to set the disk to Online: $_"
+            Write-Information -MessageData "Failed to set the disk to Online: $_"
             $rc = 1
         }
-
         try {
             # Initialize the disk with a GPT partition style
             Write-Information -MessageData "`tInitializing disk $($disk.Number) with a GPT partition style..."
             Initialize-Disk -Number $disk.Number -PartitionStyle GPT
-
             # Create a new partition that uses the entire disk
             Write-Information -MessageData "`tCreating a new partition on Disk $($disk.Number)..."
             $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize
-
             # Set the drive letter for the partition to $DriveLetter for data drive
             $partition | Where-Object Type -eq 'Basic' | Foreach-Object {
                 $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
@@ -126,25 +124,20 @@ if ($null -ne $targetDisks) {
             }
         }
         catch {
-            Write-Error "Failed to initialize the disk with a GPT partition style: $_"
+            Write-Information -MessageData "Failed to initialize the disk with a GPT partition style: $_"
             $rc = 1
         }
-
         try {
             # Format the partition as exFAT
             Format-Volume -Partition $partition -FileSystem exFAT -Confirm:$false
             Write-Host "Disk $($disk.Number) is now online, initialized, and formatted as exFAT."
         }
         catch {
-            Write-Error "Failed to format the partition as exFAT: $_"
+            Write-Information -MessageData "Failed to format the partition as exFAT: $_"
             $rc = 1
         }
     }
 }
-else {
-    Write-Host "`tNo offline disks found, nothing to do."
-}
-
 $end = Get-Date
 Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
 Write-Information -MessageData "Disk initialization completed."

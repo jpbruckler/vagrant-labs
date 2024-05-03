@@ -24,7 +24,7 @@
         Ensure that the script is run with appropriate permissions to access network configuration and write to the target file path.
 #>
 
-$path = '{0}:\vagrant\vmnetinfo.csv' -f $env:SystemDrive
+$path = Join-Path $env:SystemDrive '\vagrant\vmnetinfo.csv'
 $Output = Get-NetIPAddress | 
             Where-Object { 
                 $_.InterfaceAlias -Match 'Ethernet' -AND $_.AddressFamily -eq 'IPv4'

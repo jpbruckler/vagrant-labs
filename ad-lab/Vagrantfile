@@ -13,6 +13,7 @@ require 'yaml'
 conf    = YAML.load_file(File.join(File.dirname(__FILE__), 'provision.yaml'))
 servers = conf['servers']
 vars    = conf['vars']
+env     = conf['env']
 vdiskmgr_path = '"C:\\Program Files (x86)\\VMware\\VMware Workstation\\vmware-vdiskmanager.exe"'
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
@@ -75,6 +76,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
             # Increment the disk number for the next disk
             disk_number += 1            
           end #end disks.each
+          #srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
+          srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
         end #end if server.key?("disks")
       end #end vm.provider "vmware_desktop"
 
@@ -86,8 +89,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         srv.vm.provision "shell", reboot: true
       end
       
-      srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
-      srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
       srv.vm.provision "shell", path: "scripts/provision/configure-filesystem.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/configure-firewall.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/install-pwsh-v7.ps1", privileged: true
@@ -96,8 +97,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
       if server.key?("packages")
         srv.vm.provision "shell", path: "scripts/provision/install-chocopackages.ps1", privileged: true, args: server["packages"]
-      else
-        srv.vm.provision "shell", path: "scripts/provision/install-chocopackages.ps1", privileged: true
       end
 
       # Check if 'roles' key is defined and is an Array
@@ -106,11 +105,14 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         server["roles"].each do |role|
           case role
             when "domain-controller"
-              srv.vm.provision "shell", path: "scripts/roles/domain-controller/install-adds.ps1", privileged: true, args: "'#{vars['domainname']}' '#{vars['netbiosname']}' '#{vars['safemodepassword']}'"
+              safe_mode_pwd = vars['safemodepassword']
+              lab_domain    = vars['domainname'] || env['labdomain'] || 'lab.local'
+              lab_ntb_name  = vars['netbiosname'] || env['lablabnetbiosname'] || 'LAB'
+              srv.vm.provision "shell", path: "scripts/roles/domain-controller/install-adds.ps1", privileged: true, args: "'#{lab_domain}' '#{lab_ntb_name}' '#{safe_mode_pwd}'"
               srv.vm.provision "shell", reboot: true
               srv.vm.provision "shell", path: "scripts/roles/domain-controller/importusers.ps1", privileged: false
             when "member-server"
-              srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true, args: "'#{vars['domainname']}' '#{vars['primarydns']}'"
+              srv.vm.provision "shell", path: "scripts/roles/member-server/join-domain.ps1", privileged: true
             when "powershelluniversal"
               irms_account  = vars['irms']&.[]('account')   # safe navigation operator; set to nil if not found
               irms_password = vars['irms']&.[]('password')  # safe navigation operator; set to nil if not found
@@ -123,6 +125,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
           end #end case role
         end # end role loop
       end # end role check
+      srv.vm.provision "shell", path: "scripts/roles/member-server/write-env.ps1", privileged: true, env: env, args: "'#{vars['primarydns']}' '#{vars['domainname']}'"
       srv.vm.provision "shell", path: "scripts/utils/export-ipinfo.ps1", privileged: false
     end #end config.vm.define
   end #end servers.each

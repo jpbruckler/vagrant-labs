@@ -216,6 +216,11 @@ function Set-CDRomDriveLetter {
         [CimInstance] $Drive
     )
 
+    if (-not($DriveLetter.EndsWith(':'))) {
+        $DriveLetter = "${DriveLetter}:"
+    }
+    Write-Verbose "Attempting to reassign CD-ROM drive letter '$DriveLetter' to CD-ROM drive '$($Drive.Name)'..."
+    
     try {
         $Drive | Set-CimInstance -Property @{ DriveLetter = "$DriveLetter" } -ErrorAction Stop
         return $true

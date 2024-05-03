@@ -59,6 +59,8 @@ if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
         Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
         Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
         $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
+
+        Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
         $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
 
         if ($result) {
@@ -144,6 +146,6 @@ else {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $(($end - $start).TotalSeconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
 Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
 exit $rc

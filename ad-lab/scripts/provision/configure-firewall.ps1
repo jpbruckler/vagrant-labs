@@ -2,7 +2,7 @@ $start = Get-Date
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader
+Write-ProvisionScriptHeader -ScriptName 'configure-firewall.ps1'
 
 $Rules = @(
     "Windows Management Instrumentation (DCOM-In)",
@@ -39,6 +39,6 @@ foreach ($Rule in $Rules) {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $(($end - $start).TotalSeconds) seconds."
-Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Default firewall configuration completed."
 exit 0

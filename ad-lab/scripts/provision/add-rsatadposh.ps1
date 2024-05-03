@@ -2,7 +2,7 @@ $start = Get-Date
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader
+Write-ProvisionScriptHeader -ScriptName 'add-rsatadposh.ps1'
 if ((Get-WindowsFeature -Name RSAT-AD-PowerShell).Installed -eq $false) {
     Write-Information -MessageData "`tRSAT-AD-Tools PowerShell module not installed. Installing..."
     try {
@@ -16,6 +16,6 @@ if ((Get-WindowsFeature -Name RSAT-AD-PowerShell).Installed -eq $false) {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $(($end - $start).TotalSeconds) seconds."
-Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Windows feature installation completed."
 exit 0

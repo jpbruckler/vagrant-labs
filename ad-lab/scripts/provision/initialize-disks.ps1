@@ -122,7 +122,7 @@ if ($null -ne $targetDisks) {
                     DriveLetter     = $DriveLetter
                 }
                 Write-Information -MessageData "`tPartition $($summary.PartitionNumber) on Disk $($summary.DiskNumber) is $($summary.Size) and will be assigned drive letter $DriveLetter."
-                Set-Partition -NewDriveLetter $DriveLetter
+                $_ | Set-Partition -NewDriveLetter $DriveLetter
             }
         }
         catch {
@@ -147,5 +147,5 @@ else {
 
 $end = Get-Date
 Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
-Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
+Write-Information -MessageData "Disk initialization completed."
 exit $rc

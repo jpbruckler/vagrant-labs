@@ -2,7 +2,7 @@ $start = Get-Date
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader
+Write-ProvisionScriptHeader -ScriptName 'configure-filesystem.ps1'
 Write-Information -MessageData "Creating directories for tools and logs.."
 
 $rc = 0
@@ -24,6 +24,6 @@ foreach ($Directory in $Directories) {
     }
 }
 $end = Get-Date
-Write-Information -MessageData "Time taken: $(($end - $start).TotalSeconds) seconds."
-Write-Information -MessageData "$($MyInvocation.MyCommand.Name) completed."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Filesystem configuration completed."
 exit $rc

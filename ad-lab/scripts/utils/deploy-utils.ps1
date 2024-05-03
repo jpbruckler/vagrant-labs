@@ -303,3 +303,119 @@ function Write-AsciiBox {
 
     Write-Host $LastLine
 }
+
+<#
+.SYNOPSIS
+    Retrieves information about the latest PowerShell Universal installer for a
+    specified build type and version.
+
+.DESCRIPTION
+    This function queries a specified Azure Blob storage to find the latest
+    available installer for PowerShell Universal based on the build type, major
+    version, and installer type. It provides detailed information about the
+    installer file, including name, URL, version, last modified date, and SHA256
+    hash.
+
+.PARAMETER BuildType
+    Specifies the build type of PowerShell Universal to retrieve. Valid options
+    are 'Production' and 'Nightly'.
+    Default is 'Production'.
+
+.PARAMETER MajorVersion
+    Specifies the major version of PowerShell Universal to target. Valid options
+    are '4' and '5'.
+    
+    Default is '4'.
+
+.PARAMETER InstallerType
+    Specifies the type of installer file to retrieve. Valid options include 'msi',
+    'zip', 'desktop', 'eventhub', 'lnxX64', 'lnxARM', 'lnxARM64', 'macOS', and 
+    'macOSARM64'.
+    
+    Default is 'msi'.
+
+.EXAMPLE
+    PS> Get-PwshUniversalInstallerInfo -BuildType 'Production' -MajorVersion '5' -InstallerType 'msi'
+    Retrieves information about the latest PowerShell Universal MSI installer for
+    version 5 from the Production builds.
+
+.EXAMPLE
+    PS> Get-PwshUniversalInstallerInfo -BuildType 'Nightly' -InstallerType 'zip'
+    Retrieves information about the latest PowerShell Universal ZIP file from the
+    Nightly builds for the default major version 4.
+
+.NOTES
+    Ensure you have connectivity to the specified Azure Blob storage and proper
+    permissions to access the data. The function uses the Invoke-RestMethod 
+    cmdlet to pull data from the internet, which may require proxy configuration
+    in some environments.
+#>
+
+function Get-PwshUniversalInstallerInfo {
+    param(
+        [Parameter(Mandatory = $false, Position = 0)]
+        [ValidateSet('Production', 'Nightly')]
+        [string] $BuildType = 'Production',
+
+        [Parameter(Mandatory = $false, Position = 1)]
+        [ValidateSet('4', '5')]
+        [string] $MajorVersion = '4',
+
+        [Parameter(Mandatory = $false, Position = 2)]
+        [ValidateSet('msi', 'zip', 'desktop', 'eventhub', 'lnxX64', 'lnxARM', 'lnxARM64', 'macOS', 'macOSARM64')]
+        [string] $InstallerType = 'msi'
+    )
+
+    begin {
+        $patternTable = [PSCustomObject] @{
+            'msi'       = '\/PowerShellUniversal\.(\d{1}\.\d{1,2}\.\d{1,4})\.msi'
+            'zip'       = '\/Universal\.win7-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'desktop'   = '\/PowerShellUniversal\.Desktop\.(\d{1}\.\d{1,2}\.\d{1,4})\.exe'
+            'eventhub'  = '\/PowerShellUniversal\.EventHubClient\.(\d{1}\.\d{1,2}\.\d{1,4})\.msi'
+            'lnxX64'    = '\/Universal\.linux-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'lnxARM'    = '\/Universal\.linux-arm\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'lnxARM64'  = '\/Universal\.linux-arm64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'macOS'     = '\/Universal\.osx-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'macOSARM64'= '\/Universal\.osx\.12-arm64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+        }
+    }
+
+    process{
+        $buildStub = 'universal'
+        if ($BuildType -eq 'Nightly') {
+            $buildStub = 'universal-nightly'
+        }
+
+        $pattern = $patternTable.$InstallerType
+        $baseUri = 'https://imsreleases.blob.core.windows.net/{0}' -f $buildStub
+        $xmlUri  = '{0}?restype=container&comp=list' -f $baseUri
+        $Output  = [PSCustomObject]@{
+            Name = $null
+            Url = $null
+            Version = $null
+            LastModified = $null
+            Hash = $null
+        }
+        [xml]$response   = [regex]::replace((Invoke-RestMethod -Uri $xmlUri), "^[^<]+<", "<")
+        $file = $response.EnumerationResults.Blobs.Blob | 
+                    Select-Object -Property Name, Url, @{n="LastModified";e={(Get-Date $_.Properties.'Last-Modified')}} | 
+                    Sort-Object -Property LastModified -Descending | 
+                    Where-Object Name -match $pattern |
+                    Whre-Object Name -notmatch 'sha256' |
+                    Select-Object -First 1
+        
+        $hashUrl = '{0}.sha256' -f $file.Url
+        $hashVal = Invoke-RestMethod -Uri $hashUrl -SkipHttpErrorCheck
+        if ($hashVal -match '<Error>') {
+            $hashVal = $null
+        } else {
+            $hashVal = $hashVal -replace '\s', ''
+        }
+        $Output.Hash            = $hashVal
+        $Output.Name            = $file.Name -split '/' | Select-Object -Last 1
+        $Output.Url             = $file.Url
+        $Output.Version         = $file.Name -split '/' | Select-Object -Index 1
+        $Output.LastModified    = $file.LastModified
+        return $Output
+    }
+}

@@ -41,6 +41,6 @@ if ($Timezone -and ($Timezone -in $availableTimezones) -and ($Timezone -ne $curr
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Locale/Timezone configuration completed."
 exit 0

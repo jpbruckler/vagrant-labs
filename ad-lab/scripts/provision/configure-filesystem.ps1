@@ -24,6 +24,6 @@ foreach ($Directory in $Directories) {
     }
 }
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Filesystem configuration completed."
 exit $rc

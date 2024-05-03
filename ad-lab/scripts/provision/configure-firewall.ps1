@@ -5,33 +5,43 @@ $InformationPreference = "Continue"
 Write-ProvisionScriptHeader -ScriptName 'configure-firewall.ps1'
 
 $Rules = @(
-    "Windows Management Instrumentation (DCOM-In)",
-    "Remote Event Log Management",
-    "Remote Service Management",
-    "Remote Volume Management",
-    "Remote Scheduled Tasks Management",
-    "Windows Defender Firewall Remote Management",
-    "Windows Remote Management"
+    @{ Property = "DisplayName"; Value = "Windows Management Instrumentation (DCOM-In)" },
+    @{ Property = "DisplayGroup"; Value = "Remote Event Log Management" },
+    @{ Property = "DisplayGroup"; Value = "Remote Service Management" },
+    @{ Property = "DisplayGroup"; Value = "Remote Volume Management" },
+    @{ Property = "DisplayGroup"; Value = "Remote Scheduled Tasks Management" },
+    @{ Property = "DisplayGroup"; Value = "Windows Defender Firewall Remote Management" },
+    @{ Property = "DisplayGroup"; Value = "Windows Remote Management" }
 )
-
+Write-Information -MessageData "Configuring firewall for remote management."
 foreach ($Rule in $Rules) {
-    $ruleObject = Get-NetFirewallRule -DisplayName $Rule -ErrorAction SilentlyContinue
+    Write-Information -MessageData "`tChecking firewall rule '$($Rule.Value)'"
+
+    $splat = @{
+        $Rule.Property = $Rule.Value
+        ErrorAction = 'SilentlyContinue'
+    }
+    $ruleObject = Get-NetFirewallRule @splat
 
     if ($null -eq $ruleObject) {
-        Write-Warning -Message "Firewall rule '$Rule' not found."
+        Write-Information -MessageData "`tFirewall rule '$($Rule.Value)' not found."
         continue
     }
 
     if ($ruleObject.Enabled) {
-        Write-Information -MessageData "`tFirewall rule '$Rule' already enabled."
+        Write-Information -MessageData "`tFirewall rule '$($Rule.Value)' already enabled."
         continue
     } else {
-        Write-Information -MessageData "`tEnabling firewall rule '$Rule'."
+        Write-Information -MessageData "`tEnabling firewall rule '$($Rule.Value)'."
         try {
-            $null = Enable-NetFireWallRule -DisplayName $Rule -ErrorAction Stop
-            Write-Information -MessageData "`tFirewall rule '$Rule' enabled."
+            $enableSplatt = @{
+                $Rule.Property = $Rule.Value
+                ErrorAction = 'Stop'
+            }
+            $null = Enable-NetFireWallRule @enableSplatt
+            Write-Information -MessageData "`tFirewall rule '$($Rule.Value)' enabled."
         } catch {
-            Write-Error -Message "Failed to enable firewall rule '$Rule'."
+            Write-Error -Message "Failed to enable firewall rule '$($Rule.Value)'."
             continue;
         }
     }
@@ -39,6 +49,6 @@ foreach ($Rule in $Rules) {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Default firewall configuration completed."
 exit 0

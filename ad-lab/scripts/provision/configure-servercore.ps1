@@ -1,3 +1,7 @@
+if ((Get-ItemProperty 'HKLM:\Software\Microsoft\Windows NT\CurrentVersion' -Name 'InstallationType').InstallationType -ne 'Server Core') {
+    Write-Error -Message "This script is intended to be run on Server Core only."
+    exit 0
+}
 
 $start = Get-Date
 $InformationPreference = "Continue"
@@ -38,6 +42,6 @@ if ($result.ExitCode -eq 0) {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Server core configuration completed."
 exit 0

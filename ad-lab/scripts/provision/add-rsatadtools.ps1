@@ -19,6 +19,6 @@ if ((Get-WindowsFeature -Name RSAT-AD-PowerShell).Installed -eq $false) {
 }
 
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Windows Feature installation completed."
 exit 0

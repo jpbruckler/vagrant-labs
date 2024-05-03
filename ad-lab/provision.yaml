@@ -3,10 +3,10 @@ vars:
   domainname: dev.local
   netbiosname: DEV
   safemodepass: Admin123#
-  primarydns: 192.168.118.10
+  primarydns: 192.168.13.10
   provider:
     vmware:
-      clone_directory: "D:\\VMs\\machines\\"
+      clone_directory: "C:\\VMs"
   locale:
     culture: en-US
     timezone: Eastern Standard Time
@@ -16,30 +16,30 @@ env:
   labdns: 192.168.13.10
   labgateway: 192.168.13.2
 servers:
-  #- name: dev-dc01
-  #  box: gusztavvargadr/windows-server-2022-standard
-  #  memory: 2048
-  #  cpus: 4
-  #  staticip:
-  #    base_address: 192.168.118.10
-  #    base_mac: 00:50:56:38:10:82
-  #  roles: 
-  #    - domain-controller
+  - name: dev-dc01
+    box: gusztavvargadr/windows-server-2022-standard
+    memory: 2048
+    cpus: 4
+    staticip:
+      base_address: 192.168.13.10
+      base_mac: 00:50:56:38:10:82
+    roles: 
+      - domain-controller
   - name: dev-irms01
     box: gusztavvargadr/windows-server-2022-standard-core
     memory: 4096
     cpus: 4
-    #roles:
-      #- member-server
-      #- powershelluniversal
+    roles:
+      - member-server
+      - powershelluniversal
     disks:
       - name: universal
         size: 120
         driveletter: D
     packages:
-      - git
+      - git.install
       - helix
     irms:
-      service_account: "DTM\\svc-powershelluniversal"
+      service_account: "DEV\\svc-powershelluniversal"
       account_pw: "sockMonkey0!"
 

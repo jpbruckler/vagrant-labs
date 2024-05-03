@@ -56,37 +56,37 @@ $targetDisks = $Disks | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.Operat
 if ($null -eq $targetDisks) {
     Write-Information -MessageData "`tNo offline or raw disks found. Nothing to do."
 } else {
-    # Check if the specified drive letter is already in use by a CD-ROM drive
-    # CD-ROM has DriveType = 5
-    Write-Information -MessageData "Checking if drive letter $DriveLetter is already in use..."
-    if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
-        $usedVolume = $Volumes | Where-Object { $_.DriveLetter -eq "${DriveLetter}:" }
-        if ($usedVolume.DriveType -eq 5) {
-            Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
-            Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
-            $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
+    # Initialize and format the target disks
+    foreach ($disk in $targetDisks) {
+        # Check if the specified drive letter is already in use by a CD-ROM drive
+        # CD-ROM has DriveType = 5
+        Write-Information -MessageData "Checking if drive letter $DriveLetter is already in use..."
+        if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
+            $usedVolume = $Volumes | Where-Object { $_.DriveLetter -eq "${DriveLetter}:" }
+            if ($usedVolume.DriveType -eq 5) {
+                Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
+                Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
+                $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
 
-            Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
-            $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
+                Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
+                $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
 
-            if ($result) {
-                Write-Information -MessageData "`tDrive letter $cdDriveLetter has been reassigned to CD-ROM drive $($usedVolume.Name)."
+                if ($result) {
+                    Write-Information -MessageData "`tDrive letter $cdDriveLetter has been reassigned to CD-ROM drive $($usedVolume.Name)."
+                }
+                else {
+                    Write-Informaton -MessageData "`tFailed to reassign drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)."
+                    Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
+                    $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
+                }
             }
             else {
-                Write-Informaton -MessageData "`tFailed to reassign drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)."
+                Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a non-CD-ROM drive."
                 Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
                 $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
             }
         }
-        else {
-            Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a non-CD-ROM drive."
-            Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
-            $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
-        }
-    }
 
-    # Initialize and format the target disks
-    foreach ($disk in $targetDisks) {
         Write-Host "Initializing disk $($disk.Number)..."
         try {
             # Set the disk to Online
@@ -139,6 +139,6 @@ if ($null -eq $targetDisks) {
     }
 }
 $end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Disk initialization completed."
 exit $rc

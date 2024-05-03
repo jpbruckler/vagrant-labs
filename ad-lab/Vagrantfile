@@ -79,9 +79,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
             # Increment the disk number for the next disk
             disk_number += 1            
-          end #end disks.each
-          #srv.vm.provision "shell", path: "scripts/provision/reletter-cdrom.ps1", privileged: true
-          srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
+          end #end disks.each          
         end #end if server.key?("disks")
       end #end vm.provider "vmware_desktop"
 
@@ -93,10 +91,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         srv.vm.provision "shell", reboot: true
       end
       
+      srv.vm.provision "shell", path: "scripts/provision/initialize-disks.ps1", privileged: true
       srv.vm.provision "shell", path: "scripts/provision/configure-filesystem.ps1", privileged: false
+      srv.vm.provision "shell", path: "scripts/provision/configure-servercore.ps1", privileged: true
       srv.vm.provision "shell", path: "scripts/provision/configure-firewall.ps1", privileged: false
       srv.vm.provision "shell", path: "scripts/provision/install-choco.ps1", privileged: true
-      #srv.vm.provision "shell", reboot: true
+      srv.vm.provision "shell", reboot: true
       
 
       if server.key?("packages")
@@ -126,12 +126,12 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
               srv.vm.provision "shell", path: "scripts/provision/add-rsatadtools.ps1", privileged: true
               srv.vm.provision "shell", path: "scripts/provision/add-rsatadposh.ps1", privileged: true
               srv.vm.provision "shell", reboot: true
-              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-pwshuniversal.ps1", privileged: true, args: "'#{irms_account}' '#{irms_password}'"
+              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/download-powershelluniversal.ps1", privileged: false
+              srv.vm.provision "shell", path: "scripts/roles/powershelluniversal/install-powershelluniversal.ps1", privileged: true, args: "'#{irms_account}' '#{irms_password}'"
               srv.vm.provision "shell", reboot: true
           end #end case role
         end # end role loop
       end # end role check
-      srv.vm.provision "shell", path: "scripts/roles/member-server/write-env.ps1", privileged: true, env: env, args: "'#{vars['primarydns']}' '#{vars['domainname']}'"
       srv.vm.provision "shell", path: "scripts/utils/export-ipinfo.ps1", privileged: false
     end #end config.vm.define
   end #end servers.each

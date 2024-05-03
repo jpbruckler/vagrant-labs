@@ -65,31 +65,35 @@ param(
     [string] $ServiceAccountPassword
 )
 
-. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\psutils.ps1')
+$start = Get-Date
+$InformationPreference = "Continue"
+. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+Write-ProvisionScriptHeader -ScriptName 'configure-servercore.ps1'
+$rc = 0
 
 $SERVICE_START = 1
 
 #region Service account configuration
 if ($ServiceAccountUsername) {
-    Write-Host "Service Account Username: $ServiceAccountUsername"
+    Write-Information -MessageData "Service Account Username: $ServiceAccountUsername"
 
     $isDomJoined = (Get-CimInstance -Class Win32_ComputerSystem).PartOfDomain
     $isDomSvcAct = $ServiceAccountUsername -match '\\'
 
     if ($isDomJoined -and $isDomSvcAct) {
-        Write-Host "Domain joined machine detected. Checking for Active Directory module..."
+        Write-Information -MessageData "Domain joined machine detected. Checking for Active Directory module..."
     
         if (Get-Module -ListAvailable -Name 'ActiveDirectory') {
-            Write-Host "Checking Active Directory for service account '$ServiceAccountUsername'..."
+            Write-Information -MessageData "Checking Active Directory for service account '$ServiceAccountUsername'..."
             $ntbname,$uname = $ServiceAccountUsername -split '\\'
             $adUser         = Get-ADUser -Identity $uname -ErrorAction SilentlyContinue
             $domName        = ([System.DirectoryServices.ActiveDirectory.Domain]::GetComputerDomain()).Name
 
             if ($adUser) {
-                Write-Host "Service account '$ServiceAccountUsername' found in Active Directory."
+                Write-Information -MessageData "Service account '$ServiceAccountUsername' found in Active Directory."
             }
             else {
-                Write-Host "Service account '$ServiceAccountUsername' not found in Active Directory. Creating..."
+                Write-Information -MessageData "Service account '$ServiceAccountUsername' not found in Active Directory. Creating..."
                 New-AdUser `
                     -SamAccountName $uname `
                     -UserPrincipalName "$uname@$domName" `
@@ -103,16 +107,16 @@ if ($ServiceAccountUsername) {
             }
         }
         else {
-            Write-Host "Active Directory module not found. Skipping service account check."
-            Write-Host "PowerShell Universal Service will be installed but not started."
+            Write-Information -MessageData "Active Directory module not found. Skipping service account check."
+            Write-Information -MessageData "PowerShell Universal Service will be installed but not started."
             $SERVICE_START = 0
         }
     }
     else {
-        Write-Host "Non-domain joined machine detected. Skipping Active Directory module check."
+        Write-Information -MessageData "Non-domain joined machine detected. Skipping Active Directory module check."
     }
 
-    Write-Host "Setting local user rights for service account..."
+    Write-Information -MessageData "Setting local user rights for service account..."
     $inf = @"
 [Unicode]
 Unicode=yes
@@ -130,31 +134,31 @@ SeAssignPrimaryTokenPrivilege = "{{USERNAME}}"
     try {
         secedit.exe /configure /db secedit.sdb /cfg "C:\tmp\pshu.inf" /areas USER_RIGHTS
 
-        Write-Host "Service account rights set."
+        Write-Information -MessageData "Service account rights set."
 
-        Write-Host "Adding $ServiceAccountUsername to Performance Monitor Users and Performance Log Users groups..."
+        Write-Information -MessageData "Adding $ServiceAccountUsername to Performance Monitor Users and Performance Log Users groups..."
 
         Add-LocalGroupMember -Group "Performance Monitor Users" -Member $ServiceAccountUsername -ErrorAction Stop
         Add-LocalGroupMember -Group "Performance Log Users" -Member $ServiceAccountUsername -ErrorAction Stop
     } catch {
-        Write-Host "Failed to set service account rights."
-        Write-Host "PowerShell Universal Service will be installed but not started."
-        Write-Host "Consult PowerShell Universal documentation for setting service account rights manually."
+        Write-Information -MessageData "Failed to set service account rights."
+        Write-Information -MessageData "PowerShell Universal Service will be installed but not started."
+        Write-Information -MessageData "Consult PowerShell Universal documentation for setting service account rights manually."
         $SERVICE_START = 0
     }
 }
 else {
-    Write-Host "Service Account Username not provided. Skipping service account configuration."
+    Write-Information -MessageData "Service Account Username not provided. Skipping service account configuration."
 }
 #endregion
 
-Write-Host "Checking for existing installer in C:\vagrant\software..."
+Write-Information -MessageData "Checking for existing installer in C:\vagrant\software..."
 if (-not (Test-Path 'C:\vagrant\software\PowerShellUniversal*.msi')) {
-    Write-Host "Installer not found. Downloading PowerShell Universal..."
+    Write-Information -MessageData "Installer not found. Downloading PowerShell Universal..."
     try {
-        . C:\vagrant\scripts\roles\powershelluniversal\get-latestpwshuniversal.ps1
+        . C:\vagrant\scripts\roles\powershelluniversal\download-powershelluniversal.ps1
     } catch {
-        Write-Host "Failed to download PowerShell Universal, unable to continue."
+        Write-Information -MessageData "Failed to download PowerShell Universal, unable to continue."
         exit 1
     }
 }
@@ -171,7 +175,7 @@ $RepoFolder = '{0}:\UniversalAutomation\Repository' -f $driveLetter
 
 # Install the MSI file
 $MsiFilePath = (Resolve-Path 'C:\vagrant\software\PowerShellUniversal*.msi').Path
-Write-Host "MsiFilePath: $MsiFilePath"
+Write-Information -MessageData "Found MSI installer in path: $MsiFilePath"
 $InstallLog = "{0}\logs\{1}-install.log" -f 'c:\tmp', $(($MsiFilePath -split '\\')[-1])
 $ConnectionString = "filename=$RepoFolder\database.db"
 
@@ -182,31 +186,35 @@ if (-not (Test-Path $RepoFolder)) {
 }
 
 if ($ServiceAccountUsername) {
-    Write-Host "Adding service account to msiexec command line..."
+    Write-Information -MessageData "`tAdding service account to msiexec command line..."
     $ArgList = '{0} SERVICEACCOUNT="{1}" SERVICEACCOUNTPASSWORD="{2}"' -f $ArgList, $ServiceAccountUsername, $ServiceAccountPassword 
     
 }
 
-Write-Host "Executing msiexec command line:"
-Write-Host "`tmsiexec.exe $ArgList"
-Write-Host "Msi log: $InstallLog"
+Write-Information -MessageData "Executing msiexec command line:"
+Write-Information -MessageData "`tmsiexec.exe $ArgList"
+Write-Information -MessageData "`tInstallation log can be found at: $InstallLog"
 
 $result = Start-Process msiexec.exe -ArgumentList $ArgList -Wait -PassThru
-Write-Host "Install exited with code: $($result.ExitCode)"
+Write-Information -MessageData "`tInstall exited with code: $($result.ExitCode)"
 
 if ($result.ExitCode -ne 0) {
-    Write-Host "ERROR: PowerShell Universal installation failed. Check the log file for details: $InstallLog"
+    Write-Information -MessageData "`tERROR: PowerShell Universal installation failed. Check the log file for details: $InstallLog"
+    $rc = 1
 }
 
 $fwRule = Get-NetFirewallRule | Where-Object { $_.DisplayName -match 'PowerShell Universal' }
 
 if ($null -eq $fwRule) {
-    Write-Host "Creating firewall rule for PowerShell Universal..."
+    Write-Information -MessageData "Creating firewall rule for PowerShell Universal..."
     New-NetFirewallRule -DisplayName "PowerShell Universal" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 5000, 80, 443
-    Write-Host "Firewall rule created."
+    Write-Information -MessageData "`tFirewall rule created."
 }
 else {
-    Write-Host "Firewall rule for PowerShell Universal already exists."
+    Write-Information -MessageData "Firewall rule for PowerShell Universal already exists."
 }
 
-exit 0
+$end = Get-Date
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+Write-Information -MessageData "Server core configuration completed."
+exit $rc

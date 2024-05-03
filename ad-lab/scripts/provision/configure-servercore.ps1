@@ -29,6 +29,14 @@ if ($null -eq $pwshInstalled -and $null -ne $chocoInstalled) {
     }
 }
 
+Write-Information -MessageData "Enabling Remote Desktop..."
+$result = Start-Process cscript.exe -ArgumentList 'C:\Windows\System32\Scregedit.wsf /ar 0' -NoNewWindow -Wait -PassThru
+if ($result.ExitCode -eq 0) {
+    Write-Information -MessageData "`tRemote Desktop enabled."
+} else {
+    Write-Information -MessageData "Failed to enable Remote Desktop."
+}
+
 $end = Get-Date
 Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).Seconds) seconds."
 Write-Information -MessageData "Server core configuration completed."

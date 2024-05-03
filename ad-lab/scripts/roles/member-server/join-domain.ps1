@@ -12,9 +12,19 @@
     .PARAMETER DomainName
         The name of the domain to join. Default is "dev.local".
 
+        This is controlled in provision.yaml using the env: block.
+        
+        env:
+          labdomain: dev.local
+
     .PARAMETER DnsServer
         The IP address of the DNS server to use. If not specified, the DNS
         server address is not changed.
+
+        This is controlled in provision.yaml using the env: block.
+
+        env:
+          labdns: 192.168.13.10
 
     .PARAMETER DomainAdminUser
         The username of the domain administrator used to join the domain. Default
@@ -39,8 +49,8 @@
         Reboot the computer after execution to complete the domain join process.
 #>
 param (
-    [string] $DomainName = "dev.local",
-    [string] $DnsServer = "",
+    [string] $DomainName = $env:labdomain,
+    [string] $DnsServer = $env:labdns,
     [string] $DomainAdminUser = "vagrant",
     [string] $DomainAdminPassword = "vagrant"
 )

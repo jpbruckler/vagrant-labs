@@ -1,3 +1,41 @@
+function Write-ProvisionScriptHeader {
+    <#
+    .SYNOPSIS
+        Writes a header for a provisioning script.
+
+    .DESCRIPTION
+        This function writes a header to the console for a provisioning script.
+        The header includes the script name, a timestamp, and a description.
+
+    .PARAMETER ScriptName
+        The name of the provisioning script.
+
+    .PARAMETER Description
+        A brief description of the provisioning script.
+
+    .EXAMPLE
+        Write-ProvisionScriptHeader -ScriptName "configure-filesystem.ps1" -Description "Creates directories for tools and logs"
+
+        Writes a header for the "configure-filesystem.ps1" script with the specified description.
+    #>
+    param (
+        [Parameter(Mandatory = $false)]
+        [string] $ScriptName,
+        [string] $Title = "Vagrant Provisioning Script"
+    )
+
+    if (-not $ScriptName) {
+        $ScriptName = $MyInvocation.PSCommandPath | Split-Path -Leaf
+    }
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff K"
+    
+    $Lines = @{
+        "Script" = $ScriptName
+        "Timestamp" = $timestamp
+    }
+    Write-AsciiBox -Title $Title -Lines $Lines
+}
+
 function Write-Log {
     <#
     .SYNOPSIS
@@ -170,6 +208,28 @@ function Get-NextAvailableDriveLetter {
     return $null
 }
 
+function Set-CDRomDriveLetter {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $DriveLetter,
+        [Parameter(Mandatory = $true)]
+        [CimInstance] $Drive
+    )
+
+    if (-not($DriveLetter.EndsWith(':'))) {
+        $DriveLetter = "${DriveLetter}:"
+    }
+    Write-Verbose "Attempting to reassign CD-ROM drive letter '$DriveLetter' to CD-ROM drive '$($Drive.Name)'..."
+    
+    try {
+        $Drive | Set-CimInstance -Property @{ DriveLetter = "$DriveLetter" } -ErrorAction Stop
+        return $true
+    }
+    catch {
+        Write-Error -Message "Failed to reletter drive '$($Drive.Name)': $_"
+        return $false
+    }
+}
 
 <#
     .SYNOPSIS
@@ -212,14 +272,14 @@ function Get-NextAvailableDriveLetter {
 function Write-AsciiBox {
     param(
         [string]$Title,
-        [object]$Lines,
+        [hashtable]$Lines,
         [int]$Width = 80
     )
     
-    $FirstLine  = '+' + ('─' * ($Width - 2)) + '+'
+    $FirstLine  = '+' + ('-' * ($Width - 2)) + '+'
     $BlankLine  = '|' + (' ' * ($Width - 2)) + '|'
-    $Separator  = '+' + ('─' * ($Width - 2)) + '+'
-    $LastLine   = '+' + ('─' * ($Width - 2)) + '+'
+    $Separator  = '+' + ('-' * ($Width - 2)) + '+'
+    $LastLine   = '+' + ('-' * ($Width - 2)) + '+'
 
     Write-Host $FirstLine
     Write-Host $BlankLine
@@ -230,23 +290,13 @@ function Write-AsciiBox {
         Write-Host $Separator
         Write-Host $BlankLine
 
-        if ($Lines -is [hashtable]) {
-            # Process the hashtable
-            $longestKey = ($Lines.Keys | Measure-Object -Property Length -Maximum).Maximum
-            foreach ($line in $Lines.GetEnumerator()) {
-                $text = '{0}{1}: {2}' -f $line.Key, ('.' * (($longestKey + 4) - ($line.Key.tostring().length))), $line.Value
-                $spaces = ($Width - 3) - $text.Length
-                Write-Host ('| ' + $text + (' ' * $spaces) + '|')
-            }
-        } else {
-            $longestKey = ($Lines | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name | Measure-Object -Property Length -Maximum).Maximum
-            foreach ($line in $Lines) {
-                $line | Get-Member -MemberType NoteProperty | ForEach-Object {
-                    $text = '{0}{1}: {2}' -f $_.Name, ('.' * (($longestKey + 4) - ($_.Name.ToString().Length))), $line.($_.Name)
-                    $spaces = ($Width - 3) - $text.Length
-                    Write-Host ('| ' + $text + (' ' * $spaces) + '|')
-                }
-            }
+        $longestKey = ($Lines.Keys | Measure-Object -Property Length -Maximum).Maximum
+
+        # Process the hashtable
+        foreach ($line in $Lines.GetEnumerator()) {
+            $text = '{0}{1}: {2}' -f $line.Key, ('.' * (($longestKey + 4) - ($line.Key.tostring().length))), $line.Value
+            $spaces = ($Width - 3) - $text.Length
+            Write-Host ('| ' + $text + (' ' * $spaces) + '|')
         }
         Write-Host $BlankLine
     }
@@ -254,42 +304,54 @@ function Write-AsciiBox {
     Write-Host $LastLine
 }
 
-
 <#
-    .SYNOPSIS
-        Downloads and verifies the latest version of PowerShell Universal for a
-        specified major version.
+.SYNOPSIS
+    Retrieves information about the latest PowerShell Universal installer for a
+    specified build type and version.
 
-    .DESCRIPTION
-        This script identifies the latest version of PowerShell Universal that
-        matches a specified major version number from a predefined build type (Production or Nightly). It retrieves the MSI installer and its associated SHA256 hash from a Microsoft Azure blob storage, validates the hash to ensure the download's integrity, and saves the installer to a specified directory.
+.DESCRIPTION
+    This function queries a specified Azure Blob storage to find the latest
+    available installer for PowerShell Universal based on the build type, major
+    version, and installer type. It provides detailed information about the
+    installer file, including name, URL, version, last modified date, and SHA256
+    hash.
 
-    .PARAMETER BuildType
-        The type of build to download. Accepts 'Production' or 'Nightly'.
-        Default is 'Production'.
+.PARAMETER BuildType
+    Specifies the build type of PowerShell Universal to retrieve. Valid options
+    are 'Production' and 'Nightly'.
+    Default is 'Production'.
 
-    .PARAMETER MajorVersion
-        The major version number of PowerShell Universal to download. Currently
-        supports versions '4' and '5'. Default is '4'.
+.PARAMETER MajorVersion
+    Specifies the major version of PowerShell Universal to target. Valid options
+    are '4' and '5'.
+    
+    Default is '4'.
 
-    .PARAMETER DownloadDir
-        The directory to which the MSI file will be downloaded. Default is the
-        'software' directory under 'vagrant' on the system drive.
+.PARAMETER InstallerType
+    Specifies the type of installer file to retrieve. Valid options include 'msi',
+    'zip', 'desktop', 'eventhub', 'lnxX64', 'lnxARM', 'lnxARM64', 'macOS', and 
+    'macOSARM64'.
+    
+    Default is 'msi'.
 
-    .EXAMPLE
-        PS> Get-LatestPowerShellUniversal -BuildType 'Production' -MajorVersion '5'
-        Downloads the latest production build of PowerShell Universal version 5.
+.EXAMPLE
+    PS> Get-PwshUniversalInstallerInfo -BuildType 'Production' -MajorVersion '5' -InstallerType 'msi'
+    Retrieves information about the latest PowerShell Universal MSI installer for
+    version 5 from the Production builds.
 
-    .EXAMPLE
-        PS> .Get-LatestPowerShellUniversal -BuildType 'Nightly' -MajorVersion '4' -DownloadDir 'D:\downloads'
-        Downloads the latest nightly build of PowerShell Universal version 4 to the specified directory on the D: drive.
+.EXAMPLE
+    PS> Get-PwshUniversalInstallerInfo -BuildType 'Nightly' -InstallerType 'zip'
+    Retrieves information about the latest PowerShell Universal ZIP file from the
+    Nightly builds for the default major version 4.
 
-    .NOTES
-        The script requires internet connectivity. It also needs permissions to
-        write to the specified directory. Ensure execution policies allow script
-        running.
+.NOTES
+    Ensure you have connectivity to the specified Azure Blob storage and proper
+    permissions to access the data. The function uses the Invoke-RestMethod 
+    cmdlet to pull data from the internet, which may require proxy configuration
+    in some environments.
 #>
-function Get-LatestPowerShellUniversal {
+
+function Get-PwshUniversalInstallerInfo {
     param(
         [Parameter(Mandatory = $false, Position = 0)]
         [ValidateSet('Production', 'Nightly')]
@@ -300,85 +362,60 @@ function Get-LatestPowerShellUniversal {
         [string] $MajorVersion = '4',
 
         [Parameter(Mandatory = $false, Position = 2)]
-        [string] $DownloadDir = ('{0}:\vagrant\software' -f $env:SystemDrive)
+        [ValidateSet('msi', 'zip', 'desktop', 'eventhub', 'lnxX64', 'lnxARM', 'lnxARM64', 'macOS', 'macOSARM64')]
+        [string] $InstallerType = 'msi'
     )
 
-    # Don't change anything below this line
-    $ErrorActionPreference = 'Stop'
-    $InformationPreference = 'Continue'
-    $pattern    = '^production\/[\d\.]+\/PowerShellUniversal[\d\.]+msi'
-    $baseUri    = 'https://imsreleases.blob.core.windows.net/{0}' -f $(if ($BuildType -eq 'Nightly') { 'universal-nightly' } else { 'universal' })
-    $versUri    = '{0}/production/v{1}-version.txt' -f $baseUri, $MajorVersion
-    $xmlUri     = '{0}?restype=container&comp=list' -f $baseUri
-    $downloads  = @{ Name = ''; Msi = ''; Hash = ''}
-
-    # The XML response from the blob storage API is not well-formed, so we need to
-    # clean it up by removing non-word characters from the beginning of the response
-    $content  = Invoke-RestMethod -Uri $xmlUri 
-    $response = [regex]::replace($content, "^[^<]+<", "<")
-
-    # Get the latest version from the version file if it's not known. This saves
-    # us from having to do date math to determine the latest version
-    $latestVer  = Invoke-RestMethod -Uri $versUri -UseBasicParsing
-
-    # Parse the XML response. Try/Catch here to handle any parsing errors. If XML
-    # parsing fails, the script will exit with an error.
-    try {
-        $releases = [xml]$response
-    } catch {
-        Write-Error "Failed to parse XML response: $response"
-        exit 1
+    begin {
+        $patternTable = [PSCustomObject] @{
+            'msi'       = '\/PowerShellUniversal\.(\d{1}\.\d{1,2}\.\d{1,4})\.msi'
+            'zip'       = '\/Universal\.win7-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'desktop'   = '\/PowerShellUniversal\.Desktop\.(\d{1}\.\d{1,2}\.\d{1,4})\.exe'
+            'eventhub'  = '\/PowerShellUniversal\.EventHubClient\.(\d{1}\.\d{1,2}\.\d{1,4})\.msi'
+            'lnxX64'    = '\/Universal\.linux-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'lnxARM'    = '\/Universal\.linux-arm\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'lnxARM64'  = '\/Universal\.linux-arm64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'macOS'     = '\/Universal\.osx-x64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+            'macOSARM64'= '\/Universal\.osx\.12-arm64\.(\d{1}\.\d{1,2}\.\d{1,4})\.zip'
+        }
     }
 
+    process{
+        $buildStub = 'universal'
+        if ($BuildType -eq 'Nightly') {
+            $buildStub = 'universal-nightly'
+        }
 
-    # Determine the target files based on the latest version or the latest date
-    if ($latestVer) {
-        # No need to do any date math if the latest version is known
-        $files = $releases.EnumerationResults.Blobs.Blob | 
-                    Where-Object { $_.Name -match $latestVer -and $_.Name -match $pattern }
-    } else {
-        # If the latest version is known, determine target files by date
-        $files = $releases.EnumerationResults.Blobs.Blob | 
-                    Where-Object Name -match $pattern | 
+        $pattern = $patternTable.$InstallerType
+        $baseUri = 'https://imsreleases.blob.core.windows.net/{0}' -f $buildStub
+        $xmlUri  = '{0}?restype=container&comp=list' -f $baseUri
+        $Output  = [PSCustomObject]@{
+            Name = $null
+            Url = $null
+            Version = $null
+            LastModified = $null
+            Hash = $null
+        }
+        [xml]$response   = [regex]::replace((Invoke-RestMethod -Uri $xmlUri), "^[^<]+<", "<")
+        $file = $response.EnumerationResults.Blobs.Blob | 
                     Select-Object -Property Name, Url, @{n="LastModified";e={(Get-Date $_.Properties.'Last-Modified')}} | 
                     Sort-Object -Property LastModified -Descending | 
-                    Select-Object -First 2
-        $latestVer = $files[0].Name.split('/')[1]
-
-    }
-
-    if ($files) {
-        $Msi = $files | Where-Object Name -notmatch 'sha256'
-        $HashUrl = $files | Where-Object Name -match 'sha256' | Select-Object -ExpandProperty Url
-        $downloads.Hash = (Invoke-RestMethod -Uri $HashUrl) -replace '\s', ''
-        $downloads.Name = ($Msi.Name -split '/')[-1]
-        $downloads.Url  = $Msi.Url
-    } else {
-        Write-Error "No files found matching the pattern: $pattern"
-        exit 1
-    }
-
-    # Download the MSI file and the SHA256 hash file
-    try {
-        $MsiFilePath = Join-Path $DownloadDir "$(($downloads.Name -split '/')[-1])"
-        $downloads.Add('LocalPath', $MsiFilePath)
-
-        Write-Information "Downloading $($downloads.Name) to $MsiFilePath"
+                    Where-Object Name -match $pattern |
+                    Where-Object Name -notmatch 'sha256' |
+                    Select-Object -First 1
         
-        if (Test-Path $MsiFilePath) {
-            Remove-Item $MsiFilePath -Force
-        }
-
-        Invoke-WebRequest -Uri $downloads.Url -OutFile $MsiFilePath -UseBasicParsing
-        $DlHash = Get-FileHash -Path $MsiFilePath -Algorithm SHA256 | Select-Object -ExpandProperty Hash
-
-        if ($DlHash -eq $downloads.Hash) {
-            Write-Information "Downloaded $($downloads.Name) successfully"
-            return $downloads
+        $hashUrl = '{0}.sha256' -f $file.Url
+        $hashVal = Invoke-RestMethod -Uri $hashUrl -SkipHttpErrorCheck
+        if ($hashVal -match '<Error>') {
+            $hashVal = $null
         } else {
-            throw "Failed to download $($downloads.Name): SHA256 hash mismatch"
+            $hashVal = $hashVal -replace '\s', ''
         }
-    } catch {
-        Write-Error "Failed to download $($downloads.Name): $_"    
+        $Output.Hash            = $hashVal
+        $Output.Name            = $file.Name -split '/' | Select-Object -Last 1
+        $Output.Url             = $file.Url
+        $Output.Version         = $file.Name -split '/' | Select-Object -Index 1
+        $Output.LastModified    = $file.LastModified
+        return $Output
     }
 }

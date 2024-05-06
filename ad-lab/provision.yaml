@@ -4,6 +4,9 @@ vars:
   netbiosname: DEV
   safemodepass: Admin123#
   primarydns: 192.168.13.10
+  provider:
+    vmware:
+      clone_directory: "C:\\VMs"
   locale:
     culture: en-US
     timezone: Eastern Standard Time
@@ -16,7 +19,7 @@ servers:
   - name: dev-dc01
     box: gusztavvargadr/windows-server-2022-standard
     memory: 2048
-    cpus: 2
+    cpus: 4
     staticip:
       base_address: 192.168.13.10
       base_mac: 00:50:56:38:10:82
@@ -34,9 +37,9 @@ servers:
         size: 120
         driveletter: D
     packages:
-      - git
+      - git.install
       - helix
     irms:
-      service_account: "DTM\\svc-powershelluniversal"
+      service_account: "DEV\\svc-powershelluniversal"
       account_pw: "sockMonkey0!"
 

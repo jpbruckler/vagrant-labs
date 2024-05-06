@@ -2,29 +2,45 @@ param(
     [string] $Locale = "en-US",
     [string] $Timezone = "Eastern Standard Time"
 )
+$start = Get-Date
+$InformationPreference = "Continue"
+. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+
+Write-ProvisionScriptHeader -ScriptName 'configure-locale.ps1'
 
 $availableLocales   = [System.Globalization.CultureInfo]::GetCultures([System.Globalization.CultureTypes]::AllCultures)| Select-Object -ExpandProperty Name
-$currentLocale      = Get-WinSystemLocale
 $availableTimezones = Get-TimeZone -ListAvailable | Select-Object -ExpandProperty Id
+$currentLocale      = Get-WinSystemLocale
+$currentTimezone    = (Get-TimeZone).Id
+
+Write-Information -MessageData "Current locale: $currentLocale"
+Write-Information -MessageData "Current timezone: $currentTimezone"
 
 if ($Locale -and ($Locale -in $availableLocales) -and ($Locale -ne $currentLocale)){
     try {
+        Write-Information -MessageData "`tSetting locale to $Locale"
         Set-WinSystemLocale -SystemLocale $Locale -ErrorAction Stop
     }
     catch {
-        Write-Warning "Failed to set locale to $Locale"
+        Write-Warning "`tFailed to set locale to $Locale"
     }
+} else {
+    Write-Information -MessageData "`tLocale is already set to $currentLocale, or $Locale is not a valid locale."
 }
 
-if ($Timezone -and ($Timezone -in $availableTimezones) -and ($Timezone -ne (Get-TimeZone).Id)) {
+if ($Timezone -and ($Timezone -in $availableTimezones) -and ($Timezone -ne $currentTimezone)) {
+    Write-Information -MessageData "`tSetting timezone to $Timezone"
     try {
         Set-TimeZone -Id $Timezone -ErrorAction Stop
     }
     catch {
-        Write-Warning "Failed to set timezone to $Timezone"
+        Write-Warning "`tFailed to set timezone to $Timezone"
     }
+} else {
+    Write-Information -MessageData "`tSystem timezone is already set to $Timezone, or $Timezone is not a valid timezone."
 }
 
-# Exit with a 0 status, as this script is not critical to the success of the
-# provisioning process
+$end = Get-Date
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+Write-Information -MessageData "Locale/Timezone configuration completed."
 exit 0

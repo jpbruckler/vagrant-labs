@@ -34,56 +34,76 @@ param(
     [string] $DriveLetter = "D"
 )
 
+$start = Get-Date
+$InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
+. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+Write-ProvisionScriptHeader
+$rc = 0
 
-. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\psutils.ps1')
+$Disks = Get-Disk
+$Volumes = Get-CimInstance -ClassName Win32_Volume
 
+Write-Information -MessageData "Disk information:"
+$Disks | Select-Object Number, FriendlyName, OperationalStatus, PartitionStyle, @{n='Size';e={$u = 'gb'; $sz = $_.Size / 1gb; if ($sz -gt 1000) { $sz = $_.Size/1tb; $u = 'tb' }; '{0:N2}{1}' -f $sz,$u }} | Format-Table -AutoSize
 
+Write-Information -MessageData "Volume information:"
+$Volumes | Select-Object DriveLetter, Label, DriveType | Format-Table -AutoSize
 
-# Some vagrant box images include CD-ROM drives that are not removed when the
-# box is packaged. This script will reletter any CD-ROM drives to the next
-# available drive letter, starting from Z: and working backwards to A:.
-if ((Get-UsedDriveLetters) -contains $DriveLetter) {
-    Write-Host "Drive letter $DriveLetter is already in use."
-    Write-Host "Checking for CD-ROM drives..."
-    $CdRoms = Get-CimInstance -ClassName Win32_Volume -Filter "DriveType = 5"
+Write-Information -MessageData "Checking for offline or raw disks..."
+$targetDisks = $Disks | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.OperationalStatus -eq 'Offline' } 
 
-
-    if ($CdRoms) {
-        foreach ($drive in $CdRoms) {
-            $driveLetter = "{0}:" -f (Get-NextAvailableDriveLetter)
-            Write-Host "Relettering CD-ROM drive $($drive.Name) to $driveLetter"
-            $drive | Set-CimInstance -Property @{ DriveLetter = "$driveLetter" }
-        }
-    }
-    else {
-        Write-Host "No CD-ROM drives found. Moving on to virtual disks."
-    }
-}
-
-
-# Get all disks that are either Offline or have a RAW partition style
-$targetDisks = Get-Disk | Where-Object { $_.PartitionStyle -eq 'RAW' -OR $_.OperationalStatus -eq 'Offline' } 
-if ($null -ne $targetDisks) {
+if ($null -eq $targetDisks) {
+    Write-Information -MessageData "`tNo offline or raw disks found. Nothing to do."
+} else {
+    # Initialize and format the target disks
     foreach ($disk in $targetDisks) {
-        Write-Host "Initializing disk $($disk.Number)..."
+        # Check if the specified drive letter is already in use by a CD-ROM drive
+        # CD-ROM has DriveType = 5
+        Write-Information -MessageData "Checking if drive letter $DriveLetter is already in use..."
+        if ($Volumes.DriveLetter -contains "${DriveLetter}:") {
+            $usedVolume = $Volumes | Where-Object { $_.DriveLetter -eq "${DriveLetter}:" }
+            if ($usedVolume.DriveType -eq 5) {
+                Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a CD-ROM drive."
+                Write-Information -MessageData "`tAttempting to reassign CD-ROM drive letters."
+                $cdDriveLetter = Get-NextAvailableDriveLetter -start 88 -end 68
 
+                Write-Information -MessageData "`tReassigning CD-ROM drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)..."
+                $result = Set-CDRomDriveLetter -DriveLetter $cdDriveLetter -Drive $usedVolume
+
+                if ($result) {
+                    Write-Information -MessageData "`tDrive letter $cdDriveLetter has been reassigned to CD-ROM drive $($usedVolume.Name)."
+                }
+                else {
+                    Write-Informaton -MessageData "`tFailed to reassign drive letter $cdDriveLetter to CD-ROM drive $($usedVolume.Name)."
+                    Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
+                    $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
+                }
+            }
+            else {
+                Write-Information -MessageData "`tDrive letter $DriveLetter is already in use by a non-CD-ROM drive."
+                Write-Information -MessageData "`tNext available drive letter will be assigned to new partitions."
+                $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
+            }
+        }
+
+        Write-Host "Initializing disk $($disk.Number)..."
         try {
             # Set the disk to Online
+            Write-Information -MessageData "`tSetting disk $($disk.Number) to Online..."
             Set-Disk -Number $disk.Number -IsOffline $false
         }
         catch {
-            Write-Error "Failed to set the disk to Online: $_"
-            exit 1
+            Write-Information -MessageData "Failed to set the disk to Online: $_"
+            $rc = 1
         }
-
         try {
             # Initialize the disk with a GPT partition style
+            Write-Information -MessageData "`tInitializing disk $($disk.Number) with a GPT partition style..."
             Initialize-Disk -Number $disk.Number -PartitionStyle GPT
-
             # Create a new partition that uses the entire disk
+            Write-Information -MessageData "`tCreating a new partition on Disk $($disk.Number)..."
             $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize
-
             # Set the drive letter for the partition to $DriveLetter for data drive
             $partition | Where-Object Type -eq 'Basic' | Foreach-Object {
                 $DriveLetter = "{0}" -f (Get-NextAvailableDriveLetter -start 68 -end 90)
@@ -99,26 +119,26 @@ if ($null -ne $targetDisks) {
                     Size            = $size
                     DriveLetter     = $DriveLetter
                 }
-                Write-Host "Partition $($summary.PartitionNumber) on Disk $($summary.DiskNumber) is $($summary.Size) and will be assigned drive letter $DriveLetter."
-                Set-Partition -NewDriveLetter $DriveLetter
+                Write-Information -MessageData "`tPartition $($summary.PartitionNumber) on Disk $($summary.DiskNumber) is $($summary.Size) and will be assigned drive letter $DriveLetter."
+                $_ | Set-Partition -NewDriveLetter $DriveLetter
             }
         }
         catch {
-            Write-Error "Failed to initialize the disk with a GPT partition style: $_"
-            exit 1
+            Write-Information -MessageData "Failed to initialize the disk with a GPT partition style: $_"
+            $rc = 1
         }
-
         try {
             # Format the partition as exFAT
             Format-Volume -Partition $partition -FileSystem exFAT -Confirm:$false
             Write-Host "Disk $($disk.Number) is now online, initialized, and formatted as exFAT."
         }
         catch {
-            Write-Error "Failed to format the partition as exFAT: $_"
-            exit 1
+            Write-Information -MessageData "Failed to format the partition as exFAT: $_"
+            $rc = 1
         }
     }
 }
-else {
-    Write-Host "No offline disks found."
-}
+$end = Get-Date
+Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+Write-Information -MessageData "Disk initialization completed."
+exit $rc

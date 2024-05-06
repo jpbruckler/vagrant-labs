@@ -15,6 +15,9 @@ env:
   labnetbiosname: DEV
   labdns: 192.168.13.10
   labgateway: 192.168.13.2
+  locale:
+    culture: en-US
+    timezone: Eastern Standard Time
 servers:
   - name: dev-dc01
     box: gusztavvargadr/windows-server-2022-standard
@@ -29,6 +32,9 @@ servers:
     box: gusztavvargadr/windows-server-2022-standard-core
     memory: 4096
     cpus: 4
+    staticip:
+      base_address: 192.168.13.50
+      base_mac: 00:50:56:38:10:82
     roles:
       - member-server
       - powershelluniversal

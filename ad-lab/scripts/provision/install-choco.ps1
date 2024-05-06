@@ -1,7 +1,15 @@
-$start = Get-Date
-$InformationPreference = "Continue"
-. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
-Write-ProvisionScriptHeader -ScriptName 'install-choco.ps1'
+param(
+    [switch] $SkipHeader
+)
+
+if (-not $SkipHeader) {
+    $start = Get-Date
+    $InformationPreference = "Continue"
+    . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+    Write-ProvisionScriptHeader -ScriptName 'install-choco.ps1'
+    $rc = 0
+}
+
 $rc = 0
 
 if ($null -eq (Get-Command -Name "choco" -ErrorAction SilentlyContinue)) {
@@ -28,7 +36,7 @@ if ($null -eq (Get-Command -Name "choco" -ErrorAction SilentlyContinue)) {
         New-Item -Path $PSHOME -Name 'profile.ps1' -ItemType 'file' -Force
         Write-Information -MessageData "`tProfile created"
     }
-    #>
+    
     # Update system-wide PowerShell profile
     $profilePath = "$PSHOME\profile.ps1"
     $newContent = @'
@@ -49,12 +57,15 @@ Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
     . $profilePath
 
     Write-Information -MessageData "`tSystem-wide PowerShell profile updated."
+    #>
 } else {
     Write-Information -MessageData "Chocolatey is already installed. Nothing to do."
 }
 
 
-$end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
-Write-Information -MessageData "Chocolatey installation completed."
+if (-not $SkipHeader) {
+    $end = Get-Date
+    Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+    Write-Information -MessageData "Chocolatey installation completed."
+}
 exit $rc

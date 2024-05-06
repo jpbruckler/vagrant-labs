@@ -1,8 +1,16 @@
-$start = Get-Date
-$InformationPreference = "Continue"
-. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+param(
+    [switch] $SkipHeader
+)
 
-Write-ProvisionScriptHeader -ScriptName 'configure-firewall.ps1'
+
+if (-not $SkipHeader) {
+    $start = Get-Date
+    $InformationPreference = "Continue"
+    . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+
+    Write-ProvisionScriptHeader -ScriptName 'configure-firewall.ps1'
+}
+$rc = 0
 
 $Rules = @(
     @{ Property = "DisplayName"; Value = "Windows Management Instrumentation (DCOM-In)" },
@@ -11,7 +19,8 @@ $Rules = @(
     @{ Property = "DisplayGroup"; Value = "Remote Volume Management" },
     @{ Property = "DisplayGroup"; Value = "Remote Scheduled Tasks Management" },
     @{ Property = "DisplayGroup"; Value = "Windows Defender Firewall Remote Management" },
-    @{ Property = "DisplayGroup"; Value = "Windows Remote Management" }
+    @{ Property = "DisplayGroup"; Value = "Windows Remote Management" },
+    @{ Property = "DisplayGroup"; Value = "Remote Desktop" }
 )
 Write-Information -MessageData "Configuring firewall for remote management."
 foreach ($Rule in $Rules) {
@@ -41,14 +50,16 @@ foreach ($Rule in $Rules) {
             $null = Enable-NetFireWallRule @enableSplatt
             Write-Information -MessageData "`tFirewall rule '$($Rule.Value)' enabled."
         } catch {
-            Write-Error -Message "Failed to enable firewall rule '$($Rule.Value)'."
+            Write-Information -MessageData "`tERROR: Failed to enable firewall rule '$($Rule.Value)'."
             continue;
         }
     }
     
 }
 
-$end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
-Write-Information -MessageData "Default firewall configuration completed."
+if (-not $SkipHeader) {
+    $end = Get-Date
+    Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+    Write-Information -MessageData "Default firewall configuration completed."
+}
 exit 0

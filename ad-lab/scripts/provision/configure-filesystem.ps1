@@ -1,10 +1,15 @@
-$start = Get-Date
-$InformationPreference = "Continue"
-. (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
+param(
+    [switch] $SkipHeader
+)
+if (-not $SkipHeader) {
+    $start = Get-Date
+    $InformationPreference = "Continue"
+    . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader -ScriptName 'configure-filesystem.ps1'
+    Write-ProvisionScriptHeader -ScriptName 'configure-filesystem.ps1'
+}
+
 Write-Information -MessageData "Creating directories for tools and logs.."
-
 $rc = 0
 $Directories = @("C:\tools", "C:\tmp", "C:\tmp\logs")
 foreach ($Directory in $Directories) {
@@ -23,7 +28,10 @@ foreach ($Directory in $Directories) {
         Write-Information -MessageData "`tDirectory '$Directory' already exists."
     }
 }
-$end = Get-Date
-Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
-Write-Information -MessageData "Filesystem configuration completed."
+
+if (-not $SkipHeader) {
+    $end = Get-Date
+    Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
+    Write-Information -MessageData "Filesystem configuration completed."
+}
 exit $rc

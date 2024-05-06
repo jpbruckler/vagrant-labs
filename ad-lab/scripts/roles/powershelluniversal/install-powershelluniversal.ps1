@@ -61,10 +61,13 @@
 #>
 
 param(
-    [string] $ServiceAccountUsername,
-    [string] $ServiceAccountPassword
+    [string] $ServiceAccountUsername = 'dev\svc-irms',
+    [string] $ServiceAccountPassword = 'sockMonkey0!',
+    [string] $DomainAdminUsername = 'dev\vagrant',
+    [string] $DomainAdminPassword = 'vagrant'
 )
 
+$da = New-Object System.Management.Automation.PSCredential ($DomainAdminUsername, (ConvertTo-SecureString $DomainAdminPassword -AsPlainText -Force))
 $start = Get-Date
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
@@ -86,7 +89,7 @@ if ($ServiceAccountUsername) {
         if (Get-Module -ListAvailable -Name 'ActiveDirectory') {
             Write-Information -MessageData "Checking Active Directory for service account '$ServiceAccountUsername'..."
             $ntbname,$uname = $ServiceAccountUsername -split '\\'
-            $adUser         = Get-ADUser -Identity $uname -ErrorAction SilentlyContinue
+            $adUser         = Get-ADUser -Identity $uname -ErrorAction SilentlyContinue -Credential $da
             $domName        = ([System.DirectoryServices.ActiveDirectory.Domain]::GetComputerDomain()).Name
 
             if ($adUser) {
@@ -103,7 +106,8 @@ if ($ServiceAccountUsername) {
                     -Enabled $True `
                     -DisplayName $uname `
                     -AccountPassword (convertto-securestring $ServiceAccountPassword -AsPlainText -Force) `
-                    -PasswordNeverExpires $True
+                    -PasswordNeverExpires $True `
+                    -Credential $da
             }
         }
         else {

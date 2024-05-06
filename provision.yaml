@@ -32,12 +32,9 @@ servers:
     box: gusztavvargadr/windows-server-2022-standard-core
     memory: 4096
     cpus: 4
-    staticip:
-      base_address: 192.168.13.50
-      base_mac: 00:50:56:38:10:82
     roles:
       - member-server
-      - powershelluniversal
+      - powershell-universal
     disks:
       - name: universal
         size: 120
@@ -46,6 +43,6 @@ servers:
       - git.install
       - helix
     irms:
-      service_account: "DEV\\svc-powershelluniversal"
+      service_account: "DEV\\svc-irms"
       account_pw: "sockMonkey0!"
 

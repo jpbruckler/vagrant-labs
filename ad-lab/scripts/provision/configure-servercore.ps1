@@ -8,8 +8,8 @@ $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
 Write-ProvisionScriptHeader -ScriptName 'configure-servercore.ps1'
-$pwshInstalled = Get-Command -Name "PowerShell" -ErrorAction SilentlyContinue
-$chocoInstalled = Get-Command -Name "Chocolatey" -ErrorAction SilentlyContinue
+$pwshInstalled = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
+$chocoInstalled = Get-Command -Name "choco" -ErrorAction SilentlyContinue
 
 if ($null -eq $pwshInstalled -and $null -ne $chocoInstalled) {
     Write-Information -MessageData "Installing PowerShell v7.."
@@ -20,7 +20,7 @@ if ($null -eq $pwshInstalled -and $null -ne $chocoInstalled) {
         Write-Error -Message "Failed to install PowerShell v7."
     }
 } elseif ($null -eq $pwshInstalled -and $null -eq $chocoInstalled) {
-    Write-Error -Message "Neither chocolatey or PowerShell 7 are installed. Unable to cotinue."
+    Write-Error -Message "Neither chocolatey or PowerShell 7 are installed. Unable to continue."
 } else {
     Write-Information -MessageData "PowerShell v7 is already installed."
     Write-Information -MessageData "Setting PowerShell v7 as the default shell.."

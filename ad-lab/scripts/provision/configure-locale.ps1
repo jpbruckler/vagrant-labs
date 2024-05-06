@@ -2,7 +2,7 @@ param(
     [string] $Locale = "en-US",
     [string] $Timezone = "Eastern Standard Time"
 )
-$start = Get-Date
+$start = Get-Date ([datetime]::UtcNow)
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\scripts\utils\deploy-utils.ps1')
 
@@ -40,7 +40,7 @@ if ($Timezone -and ($Timezone -in $availableTimezones) -and ($Timezone -ne $curr
     Write-Information -MessageData "`tSystem timezone is already set to $Timezone, or $Timezone is not a valid timezone."
 }
 
-$end = Get-Date
+$end = Get-Date ([datetime]::UtcNow)
 Write-Information -MessageData "Time taken: $((New-TimeSpan -Start $start -End $end).ToString('c'))"
 Write-Information -MessageData "Locale/Timezone configuration completed."
 exit 0

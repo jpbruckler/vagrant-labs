@@ -2,7 +2,7 @@ $start = Get-Date ([datetime]::UtcNow)
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\src\utils\deploy-utils.ps1')
 $LASTEXITCODE = 0
-Write-ProvisionScriptHeader -ScriptName 'install-powershelluniversal.ps1'
+Write-ProvisionScriptHeader -ScriptName 'create-pwshufirewallrule.ps1'
 
 Write-Information -MessageData "Checking for existing firewall rule..."
 

@@ -3,10 +3,10 @@ vars:
   domainname: dev.local
   netbiosname: DEV
   safemodepass: Admin123#
-  primarydns: 192.168.118.10
+  primarydns: 192.168.13.10
   provider:
     vmware:
-      clone_directory: "D:\\VMs\\Machines"
+      clone_directory: "C:\\VMs"
   locale:
     culture: en-US
     timezone: Eastern Standard Time
@@ -21,7 +21,7 @@ servers:
     memory: 2048
     cpus: 4
     staticip:
-      base_address: 192.168.118.10
+      base_address: 192.168.13.10
       base_mac: 00:50:56:38:10:82
     roles: 
       - domain-controller
@@ -30,7 +30,7 @@ servers:
     memory: 4096
     cpus: 4
     staticip:
-      base_address: 192.168.118.50
+      base_address: 192.168.13.50
       base_mac: 00:50:56:20:6F:27
     roles:
       - member-server

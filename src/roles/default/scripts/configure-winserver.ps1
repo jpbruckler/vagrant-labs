@@ -63,6 +63,7 @@ try {
     Write-Information -MessageData "`tExecution Policy set to RemoteSigned."
 } catch {
     Write-Information -MessageData "ERROR: Failed to set Execution Policy to RemoteSigned."
+    Write-Information -MessageData "$_"
 }
 
 Write-Information -MessageData "Setting PSGallery as a trusted repository..."

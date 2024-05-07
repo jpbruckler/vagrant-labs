@@ -9,7 +9,7 @@ $start = Get-Date ([datetime]::UtcNow)
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\src\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader -ScriptName 'install-powershelluniversal.ps1'
+Write-ProvisionScriptHeader -ScriptName 'create-domainserviceaccount.ps1'
 
 $Credential = New-Object System.Management.Automation.PSCredential -ArgumentList ($DomainAdmin, (ConvertTo-SecureString $DomainAdminPw -AsPlainText -Force))
 $Credential

@@ -1,6 +1,7 @@
 irms_account  = server['irms']&.[]('service_account')  || nil # safe navigation operator; set to nil if not found
 irms_password = server['irms']&.[]('account_pw') || nil  # safe navigation operator; set to nil if not found
 srv.vm.provision "shell", path: "#{default_scripts}/add-rsatadposh.ps1", privileged: true
+srv.vm.provision "shell", path: "#{role_scripts}/install-psmodules.ps1", privileged: true
 srv.vm.provision "shell", reboot: true
 
 # Create and configure service account

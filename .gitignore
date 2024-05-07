@@ -17,7 +17,7 @@
 # lab files
 *.lab
 lab-hosts.txt
-*.csv
+vmnetinfo.csv
 
 # Exclude everything in all 'software' folders except .gitkeep files
 /software/*

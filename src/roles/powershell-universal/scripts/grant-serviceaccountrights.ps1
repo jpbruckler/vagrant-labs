@@ -12,8 +12,8 @@ Write-ProvisionScriptHeader -ScriptName 'grant-serviceaccountrights.ps1'
 
 if (-not (Get-Module -ListAvailable -Name 'Carbon')) {
     Write-Information -MessageData "Installing Carbon module for local group management..."
-    Install-Module -Name 'Carbon' -Force -AcceptLicense -Scope AllUsers
-    Import-Module -Name 'Carbon' -Force
+    Install-Module -Name 'Carbon' -Force -Scope AllUsers
+    Import-Module -Name 'Carbon'
     Write-Information -MessageData "`tCarbon module installed."
 }
 

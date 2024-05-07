@@ -1,0 +1,1 @@
+Write-Information -MessageData 'I got called from the domain-controller role!' -InformationAction Continue

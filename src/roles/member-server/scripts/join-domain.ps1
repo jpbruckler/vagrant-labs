@@ -68,8 +68,10 @@ Write-Information -MessageData "`tDomain Admin User: $DomainAdminUser"
 
 
 if ($DnsServer) {
-    Write-Information -MessageData "`tSetting DNS server address to $DnsServer for interface 'Ethernet0'."
-    Set-DnsClientServerAddress -ServerAddresses $DnsServer -InterfaceAlias 'Ethernet0'
+    Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Foreach-Object {
+        Write-Information -MessageData "`tSetting DNS server address to $DnsServer for interface '$($_.Name)'."
+        Set-DnsClientServerAddress -ServerAddresses $DnsServer -InterfaceAlias $_.Name
+    } 
 }
 
 $UpdatedSearchList = @()
@@ -91,7 +93,7 @@ $credential = New-Object System.Management.Automation.PSCredential ($DomainAdmin
 try {
     Add-Computer -DomainName $DomainName -Credential $credential -ErrorAction Stop
 } catch {
-    Write-Error -MessageData "Failed to join the computer to the domain. Error: $_"
+    Write-Information -MessageData "Failed to join the computer to the domain. Error: $_"
     exit 1
 }
 

@@ -2,16 +2,7 @@ $start = Get-Date ([datetime]::UtcNow)
 $InformationPreference = "Continue"
 . (Join-Path $env:SystemDrive 'vagrant\src\utils\deploy-utils.ps1')
 
-Write-ProvisionScriptHeader -ScriptName 'configure-winserver.ps1' -Description @"
-General Windows Server Configuration
-
-    - sets the execution policy to RemoteSigned
-    - sets PSGallery as a trusted
-    - creates directories for tools and logs
-    - configures default firewall rules
-    - enables Remote Desktop
-    - (Server Core) sets PowerShell v7 as the default shell
-"@
+Write-ProvisionScriptHeader -ScriptName 'configure-winserver.ps1' 
 
 $pwshInstalled = Get-Command -Name "pwsh" -ErrorAction SilentlyContinue
 $chocoInstalled = Get-Command -Name "choco" -ErrorAction SilentlyContinue
